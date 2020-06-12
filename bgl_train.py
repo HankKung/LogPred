@@ -17,15 +17,19 @@ def generate(name):
     num_sessions = 0
     inputs = []
     outputs = []
-    with open('data/' + name, 'r') as f:
+    with open(name+'/window_20future_5/normal.txt', 'r') as f_len:
+        file_len = len(f_len.readlines())
+    with open(name+'/window_20future_5/normal.txt', 'r') as f:
         for line in f.readlines():
-            num_sessions += 1
-            line = tuple(map(lambda n: n - 1, map(int, line.strip().split())))
-            for i in range(len(line) - window_size):
-                inputs.append(line[i:i + window_size])
-                outputs.append(line[i + window_size])
+            if num_sessions < int(file_len *0.1):
+                num_sessions += 1
+                line = tuple(map(lambda n: n, map(int, line.strip().split())))
+                inputs.append(line[:20])
+            else:
+                break
+
     print('Number of sessions({}): {}'.format(name, num_sessions))
-    print('Number of seqs({}): {}'.format(name, len(inputs)))
+    outputs = inputs
     dataset = TensorDataset(torch.tensor(inputs, dtype=torch.float), torch.tensor(outputs))
     return dataset
 
