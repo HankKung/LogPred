@@ -26,10 +26,11 @@ for i, row in df_stru.iterrows():
 	keys[i].append(str(row['LineId']))
 	keys[i].append(row['Label'])
 	keys[i].append(str(temp2key[row['EventId']])) 
+	keys[i].append(str(row['Timestamp']))
 
 with open('keys.txt', 'w') as f:
 	for i, item in enumerate(keys):
 		if i % 200000 == 0 :
 			print('writing log '+str(i/log_len) + '%')
-		key = item[0]+' '+item[1]+' '+item[2]+'\n'
+		key = item[0]+' '+item[1]+' '+item[2] + item[3] + '\n'
 		f.write(key)
