@@ -1,3 +1,5 @@
 
 *.pt
 model/.DS_Store
+bgl/data.numbers
+bgl/data.csv

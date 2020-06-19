@@ -1,18 +1,18 @@
 import os
 
-window_size = 3
-future_step = 1
+window_size = 20
+future_step = 0
 ratio = 0.8
-with open('keys.txt', 'r') as f:
+with open('keys_with_time.txt', 'r') as f:
 	all_lines = f.readlines()
 
 time_start = int(all_lines[0].strip().split()[-1])
 time_end = int(all_lines[-1].strip().split()[-1])
 time_interval = float(time_end - time_start)
-time_split = int(time_interval * ratio)
+time_split = int(time_interval * ratio + float(time_start))
 normal_train_split = []
 normal_test_split = []
-abnormal_split = []
+abnormal_test_split = []
 for i in range(0, len(all_lines)-(window_size+future_step)):
 	key_seq = ''
 	normal = True
@@ -22,12 +22,12 @@ for i in range(0, len(all_lines)-(window_size+future_step)):
 			normal = False 
 		elif future_step == 0 and all_lines[i+j].strip().split()[1] != '-':
 			normal = False
-	if normal and int(all_lines[i+j].strip().split()[-1]) <= time_split:
+	if normal and int(all_lines[i].strip().split()[-1]) <= time_split:
 		normal_train_split.append(key_seq)
-	elif normal and int(all_lines[i+j].strip().split()[-1]) > time_split:
+	elif normal and int(all_lines[i].strip().split()[-1]) > time_split:
 		normal_test_split.append(key_seq)
 	else:
-		abnormal_split.append(key_seq)
+		abnormal_test_split.append(key_seq)
 
 
 data_dir = 'window_' + str(window_size) + 'future_' + str(future_step)+'/' 
@@ -66,7 +66,7 @@ with open(data_dir+'abnormal_test.txt', 'w') as f:
 print('normal_train_split_len:')
 print(len(normal_train_split))
 
-print('normal_split_len:')
+print('normal_test_split_len:')
 print(len(normal_test_split))
 
 print('abnormal_split_len:')
@@ -79,3 +79,11 @@ print(len(normal_test_key))
 print('number of key in abnormal:')
 print(len(abnormal_test_key))
 
+print(time_start)
+print(time_end)
+print(time_interval)
+print(time_split)
+
+for i in normal_train_key:
+	print(i)
+	break
