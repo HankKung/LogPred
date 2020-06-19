@@ -13,22 +13,22 @@ import os
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
-def generate(name):
+def generate(name, window_size):
     num_sessions = 0
     inputs = []
     outputs = []
-    with open(name+'/window_20future_0/normal.txt', 'r') as f_len:
+    num_keys = set()
+    with open(name+'/window_'+str(window_size)+'future_0/normal_train.txt', 'r') as f_len:
         file_len = len(f_len.readlines())
-    with open(name+'/window_20future_0/normal.txt', 'r') as f:
+    with open(name+'/window_'+str(window_size)+'future_0/normal_train.txt', 'r') as f:
         for line in f.readlines():
-            if num_sessions < int(file_len *0.5):
-                num_sessions += 1
-                line = tuple(map(lambda n: n, map(int, line.strip().split())))
-                inputs.append(line[:20])
-            else:
-                break
-
+            num_sessions += 1
+            line = tuple(map(lambda n: n, map(int, line.strip().split())))
+            inputs.append(line)
+            for key in line:
+                num_keys.add(key)
     print('Number of sessions({}): {}'.format(name, num_sessions))
+    print('number of keys:{}'.format(len(num_keys)))
     outputs = inputs
     dataset = TensorDataset(torch.tensor(inputs, dtype=torch.float), torch.tensor(outputs))
     return dataset
@@ -51,16 +51,15 @@ class AE(nn.Module):
     def forward(self, x):
         h0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(device)
         c0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(device)
-        out, hidden_state = self.encoder(x, (h0, c0))
-        # result = []
-        # for i in range(self.seq_len):
-        out , hidden_state = self.decoder(out, hidden_state)
-        out = self.fc(F.log_softmax(out))
+
+        h_d = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(device)
+        c_d = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(device)
+
+        out, _ = self.encoder(x, (h0, c0))
+        out , _ = self.decoder(out, (h_d, c_d))
+        out = self.fc(out)
         return out
-            # out_i = F.log_softmax(out)
-            # result.append(self.fc(out_i))
-            
-        # return result
+
 
 
 
@@ -75,26 +74,26 @@ if __name__ == '__main__':
     
     parser = argparse.ArgumentParser()
     parser.add_argument('-num_layers', default=2, type=int)
-    parser.add_argument('-hidden_size', default=64, type=int)
+    parser.add_argument('-hidden_size', default=128, type=int)
     parser.add_argument('-window_size', default=20, type=int)
-    parser.add_argument('-ratio', default=0.1, type=float)
-    parser.add_argument('-epoch', default=100, type=int)
-
+    parser.add_argument('-epoch', default=150, type=int)
+    parser.add_argument('-capture', type=str, default='')
     args = parser.parse_args()
     num_layers = args.num_layers
     hidden_size = args.hidden_size
     window_size = args.window_size
-    ratio = args.ratio
     num_epochs = args.epoch
 
-    log = 'window_size='+str(window_size) + '_ratio=' + str(ratio) + '_epoch=' + str(num_epochs)
-    log = log + '_ae' 
+    log = 'window_size='+str(window_size) \
+    +'_hidden_size='+str(hidden_size)+'_num_layer='+str(num_layers)+\
+     '_epoch=' + str(num_epochs)
+    log = log + '_ae' + args.capture
 
 
     model = AE(input_size, hidden_size, num_layers, num_classes, window_size)
     model = model.to(device)
 
-    seq_dataset = generate('bgl')
+    seq_dataset = generate('bgl', window_size)
     dataloader = DataLoader(seq_dataset, batch_size=batch_size, shuffle=True, pin_memory=True)
     writer = SummaryWriter(log_dir='log/' + log)
 
@@ -125,7 +124,7 @@ if __name__ == '__main__':
             loss.backward()
             train_loss += loss.item()
             optimizer.step()
-            writer.add_graph(model, seq)
+            #writer.add_graph(model, seq)
             tbar.set_description('Train loss: %.3f' % (train_loss / (step + 1)))
         print('Epoch [{}/{}], train_loss: {:.4f}'.format(epoch + 1, num_epochs, train_loss / total_step))
         writer.add_scalar('train_loss', train_loss / total_step, epoch + 1)
