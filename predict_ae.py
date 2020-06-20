@@ -94,11 +94,8 @@ if __name__ == '__main__':
     '_epoch=' + str(num_epochs)
     log = log + '_ae' + args.capture + '.pt' 
 
-    model.load_state_dict(torch.load(log))
-    model.eval()
-
     criterion = nn.CrossEntropyLoss()
-    if args.dataset == 'hdfs':
+    if args.dataset == 'hd':
         test_normal_loader = generate_hdfs('hdfs_test_normal', window_size)
         test_abnormal_loader = generate_hdfs('hdfs_test_abnormal', window_size)
         num_classes = 28
@@ -110,6 +107,8 @@ if __name__ == '__main__':
     len_abnormal = len(test_abnormal_loader)
 
     model = AE(input_size, hidden_size, num_layers, num_classes, window_size).to(device)
+    model.load_state_dict(torch.load(log))
+    model.eval()
 
     TP = 0
     FP = 0
