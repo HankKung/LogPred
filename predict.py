@@ -9,11 +9,8 @@ from tqdm import tqdm
 device = torch.device("cuda")
 
 
-def generate(name):
-    # If you what to replicate the DeepLog paper results(Actually, I have a better result than DeepLog paper results),
-    # you should use the 'list' not 'set' to obtain the full dataset, I use 'set' just for test and acceleration.
+def generate(name, window_size):
     hdfs = []
-    # hdfs = []
     with open('data/' + name, 'r') as f:
         for ln in f.readlines():
             ln = list(map(lambda n: n - 1, map(int, ln.strip().split())))
@@ -23,12 +20,13 @@ def generate(name):
     print('Number of sessions({}): {}'.format(name, len(hdfs)))
     return hdfs
 
-def generate_bgl(name, split, window_size):
+def generate_bgl(split, window_size):
     num_sessions = 0
     bgl = []
-    with open(name+'/window_' + str(window_size) +'future_1/'+ split, 'r') as f_len:
+    ### future one: DeepLog framework predict the next one log
+    with open(name+'bgl/window_' + str(window_size) +'future_1/'+ split, 'r') as f_len:
         file_len = len(f_len.readlines())
-    with open(name+'/window_'+ str(window_size) + 'future_1/'+ split, 'r') as f:
+    with open(name+'bgl/window_'+ str(window_size) + 'future_1/'+ split, 'r') as f:
         for line in f.readlines():
             num_sessions += 1
             line = tuple(map(lambda n: n, map(int, line.strip().split())))
@@ -73,7 +71,6 @@ class Att(nn.Module):
         print('Total param size: {}'.format(size))
 
     def forward(self, x):
-
         h0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(device)
         c0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(device)
         out, (final_hidden_state, final_cell_state) = self.lstm(x, (h0, c0))
@@ -112,9 +109,9 @@ class Att(nn.Module):
         new_hidden_state = torch.bmm(lstm_output.transpose(1, 2), soft_attn_weights.unsqueeze(2)).squeeze(2)
         return new_hidden_state
 
-class Train_Att(nn.Module):
+class Trainable_Att(nn.Module):
     def __init__(self, input_size, hidden_size, num_layers, num_keys):
-        super(Train_Att, self).__init__()
+        super(Trainable_Att, self).__init__()
         self.hidden_size = hidden_size
         self.num_layers = num_layers
         self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)
@@ -126,7 +123,6 @@ class Train_Att(nn.Module):
         print('Total param size: {}'.format(size))
 
     def forward(self, x):
-
         h0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(device)
         c0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(device)
         out, (final_hidden_state, final_cell_state) = self.lstm(x, (h0, c0))
@@ -154,7 +150,7 @@ if __name__ == '__main__':
     parser.add_argument('-window_size', default=10, type=int)
     parser.add_argument('-num_candidates', default=9, type=int)
     parser.add_argument('-model', type=str, default='dl', \
-        choices=['dl', 'att', 'train_att'])
+        choices=['dl', 'att', 'trainable_att'])
     parser.add_argument('-dataset', type=str, default='hd', \
         choices=['hd', 'bgl'])
     parser.add_argument('-epoch', default=300, type=int)
@@ -166,32 +162,33 @@ if __name__ == '__main__':
     num_candidates = args.num_candidates
     # model_path = 'model/Adam_batch_size=2048_epoch=300'
     # model_path = model_path + '_' + args.model + '.pt'
-    log = 'model/num_layer='+str(num_layers)+'_window_size='+str(window_size)+\
-    '_hidden='+str(hidden_size)+'_dataset='+args.dataset+'_epoch='+str(args.epoch)
-    log = log + '_' + args.model + '.pt'
+    log = 'model/num_layer=' + str(num_layers) + \
+    '_window_size=' + str(window_size) + \
+    '_hidden=' + str(hidden_size) + \
+    '_dataset=' + args.dataset +\
+    '_epoch='+str(args.epoch)
+    log = log + '_' + args.model
+    log = log + '.pt'
 
     if args.dataset == 'hd':
-        test_normal_loader = generate('hdfs_test_normal')
-        test_abnormal_loader = generate('hdfs_test_abnormal')
+        test_normal_loader = generate('hdfs_test_normal', window_size)
+        test_abnormal_loader = generate('hdfs_test_abnormal', window_size)
         num_classes = 28
     elif args.dataset == 'bgl':
-        test_normal_loader = generate_bgl('bgl', 'normal_test.txt', window_size)
-        test_abnormal_loader = generate_bgl('bgl', 'abnormal_test.txt', window_size)
+        test_normal_loader = generate_bgl('normal_test.txt', window_size)
+        test_abnormal_loader = generate_bgl('abnormal_test.txt', window_size)
         num_classes = 1834
 
     if args.model == 'dl':
         model = DL(input_size, hidden_size, num_layers, num_classes)
     elif args.model == 'att':
         model = Att(input_size, hidden_size, num_layers, num_classes)
-    elif args.model == 'train_att':
-        model = Train_Att(input_size, hidden_size, num_layers, num_classes)
+    elif args.model == 'trainable_att':
+        model = Trainable_Att(input_size, hidden_size, num_layers, num_classes)
     model = model.to(device)
-
-
 
     model.load_state_dict(torch.load(log))
     model.eval()
-
 
     TP = 0
     FP = 0
@@ -211,7 +208,6 @@ if __name__ == '__main__':
                     if label not in predicted:
                         FP += 1
                         break
-
     elif args.dataset == 'bgl':
         with torch.no_grad():
             for index, line in enumerate(tbar):

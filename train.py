@@ -12,7 +12,6 @@ import os
 # Device configuration
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-
 def generate(name):
     num_sessions = 0
     inputs = []
@@ -71,7 +70,6 @@ class DL(nn.Module):
         out = self.fc(out[:, -1, :])
         return out
 
-
 class Att(nn.Module):
     def __init__(self, input_size, hidden_size, num_layers, num_keys):
         super(Att, self).__init__()
@@ -125,9 +123,9 @@ class Att(nn.Module):
         new_hidden_state = torch.bmm(lstm_output.transpose(1, 2), soft_attn_weights.unsqueeze(2)).squeeze(2)
         return new_hidden_state
 
-class Train_Att(nn.Module):
+class Trainable_Att(nn.Module):
     def __init__(self, input_size, hidden_size, num_layers, num_keys):
-        super(Train_Att, self).__init__()
+        super(Trainable_Att, self).__init__()
         self.hidden_size = hidden_size
         self.num_layers = num_layers
         self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)
@@ -157,12 +155,9 @@ class Train_Att(nn.Module):
         new_hidden_state = torch.tanh(new_hidden_state)
         return new_hidden_state
 
-
 if __name__ == '__main__':
 
     # Hyperparameters
-    
-    num_epochs = 300
     batch_size = 2048
     input_size = 1
     model_dir = 'model'
@@ -171,18 +166,20 @@ if __name__ == '__main__':
     parser.add_argument('-num_layers', default=2, type=int)
     parser.add_argument('-hidden_size', default=64, type=int)
     parser.add_argument('-window_size', default=10, type=int)
-    parser.add_argument('-model', type=str, default='dl', \
-        choices=['dl', 'att', 'train_att'])
-    parser.add_argument('-dataset', type=str, default='hd', \
-        choices=['hd', 'bgl'])
+    parser.add_argument('-model', type=str, default='dl', choices=['dl', 'att', 'trainable_att'])
+    parser.add_argument('-dataset', type=str, default='hd', choices=['hd', 'bgl'])
     parser.add_argument('-epoch', default=300, type=int)
     args = parser.parse_args()
     num_layers = args.num_layers
     hidden_size = args.hidden_size
     window_size = args.window_size
     num_epochs = args.epoch
-    log = 'num_layer='+str(num_layers)+'_window_size='+str(window_size)+\
-    '_hidden='+str(hidden_size)+'_dataset='+args.dataset+'_epoch='+str(args.epoch)
+
+    log = 'num_layer=' + str(num_layers) + \
+    '_window_size=' + str(window_size) + \
+    '_hidden=' + str(hidden_size) + \
+    '_dataset=' + args.dataset + \
+    '_epoch='+str(args.epoch)
     log = log + '_' + args.model
 
     if args.dataset == 'hd':
@@ -196,8 +193,8 @@ if __name__ == '__main__':
         model = DL(input_size, hidden_size, num_layers, num_classes)
     elif args.model == 'att':
         model = Att(input_size, hidden_size, num_layers, num_classes)
-    elif args.model == 'train_att':
-        model = Train_Att(input_size, hidden_size, num_layers, num_classes)
+    elif args.model == 'trainable_att':
+        model = Trainable_Att(input_size, hidden_size, num_layers, num_classes)
 
     model = model.to(device)
 
@@ -219,15 +216,14 @@ if __name__ == '__main__':
             output = model(seq)
             loss = criterion(output, label.to(device))
 
-            # Backward and optimize
             optimizer.zero_grad()
             loss.backward()
             train_loss += loss.item()
             optimizer.step()
-            # writer.add_graph(model, seq)
             tbar.set_description('Train loss: %.3f' % (train_loss / (step + 1)))
         print('Epoch [{}/{}], train_loss: {:.4f}'.format(epoch + 1, num_epochs, train_loss / total_step))
         writer.add_scalar('train_loss', train_loss / total_step, epoch + 1)
+
     if not os.path.isdir(model_dir):
         os.makedirs(model_dir)
     torch.save(model.state_dict(), model_dir + '/' + log + '.pt')
