@@ -70,8 +70,6 @@ class AE(nn.Module):
 if __name__ == '__main__':
 
     # Hyperparameters
-    num_classes = 1834
-    input_size = 1
     parser = argparse.ArgumentParser()
     parser.add_argument('-dataset', type=str, default='hd', choices=['hd', 'bgl'])
     parser.add_argument('-num_layers', default=2, type=int)
@@ -86,6 +84,7 @@ if __name__ == '__main__':
     window_size = args.window_size
     num_epochs = args.epoch
     threshold = args.error_threshold
+    input_size = 1
 
     log = 'model/' + \
     'dataset=' + args.dataset + \
