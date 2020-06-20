@@ -19,8 +19,6 @@ def generate_bgl(name, window_size):
             line = tuple(map(lambda n: n, map(int, line.strip().split())))
             inputs.append(line)
             num_sessions += 1
-            # else:
-            #      continue
 
     print('Number of sessions({}): {}'.format(name, num_sessions))
     return inputs
@@ -35,7 +33,6 @@ def generate_hdfs(name, window_size):
             for i in range(len(line) - window_size):
                 seq = line[i:i + window_size]
                 hdfs.append(tuple(seq))
-            # hdfs.append(tuple(ln))
     print('Number of sessions({}): {}'.format(name, len(hdfs)))
     return hdfs
 
@@ -103,6 +100,7 @@ if __name__ == '__main__':
         test_normal_loader = generate('normal_test.txt', window_size)
         test_abnormal_loader = generate('abnormal_test.txt', window_size)
         num_classes = 1834
+    num_classes +=1
     len_normal = len(test_normal_loader)
     len_abnormal = len(test_abnormal_loader)
 

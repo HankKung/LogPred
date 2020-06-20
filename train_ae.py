@@ -28,7 +28,7 @@ def generate_bgl(window_size):
             outputs.append(line)
             for key in line:
                 num_keys.add(key)
-    print('Number of sessions({}): {}'.format(name, num_sessions))
+    print('Number of sessions: {}'.format(num_sessions))
     print('number of keys:{}'.format(len(num_keys)))
     dataset = TensorDataset(torch.tensor(inputs, dtype=torch.float), torch.tensor(outputs))
     return dataset
@@ -37,14 +37,14 @@ def generate_hdfs(window_size):
     num_sessions = 0
     inputs = []
     outputs = []
-    with open('data/hdfs_train' 'r') as f:
+    with open('data/hdfs_train', 'r') as f:
         for line in f.readlines():
             num_sessions += 1
             line = tuple(map(lambda n: n - 1, map(int, line.strip().split())))
             for i in range(len(line) - window_size):
                 inputs.append(line[i:i + window_size])
                 outputs.append(line[i:i + window_size])
-    print('Number of sessions({}): {}'.format(name, num_sessions))
+    print('Number of sessions: {}'.format(num_sessions))
     dataset = TensorDataset(torch.tensor(inputs, dtype=torch.float), torch.tensor(outputs))
     return dataset
 
@@ -95,12 +95,13 @@ if __name__ == '__main__':
     window_size = args.window_size
     num_epochs = args.epoch
 
-    if args.dataset == 'hdfs':
+    if args.dataset == 'hd':
         seq_dataset = generate_hdfs(window_size)
         num_classes = 28
     elif args.dataset == 'bgl':
         seq_dataset = generate_bgl(window_size)
         num_classes = 1834
+    num_classes +=1
     dataloader = DataLoader(seq_dataset, batch_size=batch_size, shuffle=True, pin_memory=True)
 
 
