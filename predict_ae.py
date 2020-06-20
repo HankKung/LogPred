@@ -9,7 +9,7 @@ from tqdm import tqdm
 device = torch.device("cuda")
 
 
-def generate(name, window_size):
+def generate_bgl(name, window_size):
     num_sessions = 0
     inputs = []
     with open('bgl/window_'+str(window_size)+'future_0/' + name, 'r') as f_len:
@@ -25,6 +25,19 @@ def generate(name, window_size):
     print('Number of sessions({}): {}'.format(name, num_sessions))
     return inputs
 
+def generate_hdfs(name, window_size):
+    hdfs = []
+    with open('data/' + name, 'r') as f:
+        for line in f.readlines():
+            line = list(map(lambda n: n - 1, map(int, line.strip().split())))
+            ### pad -1 if the sequence len is less than the window_size
+            line = line + [-1] * (window_size + 1 - len(line))
+            for i in range(len(line) - window_size):
+                seq = line[i:i + window_size]
+                hdfs.append(tuple(seq))
+            # hdfs.append(tuple(ln))
+    print('Number of sessions({}): {}'.format(name, len(hdfs)))
+    return hdfs
 
 class AE(nn.Module):
     def __init__(self, input_size, hidden_size, num_layers, num_keys, seq_len):
@@ -42,18 +55,17 @@ class AE(nn.Module):
         print('Total param size: {}'.format(size))
 
     def forward(self, x):
-        h0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(device)
-        c0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(device)
-        out, hidden_state = self.encoder(x, (h0, c0))
-        # result = []
-        # for i in range(self.seq_len):
-        out , hidden_state = self.decoder(out, hidden_state)
+        h_e = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(device)
+        c_e = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(device)
+
+        h_d = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(device)
+        c_d = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(device)
+
+        out, _ = self.encoder(x, (h_e, c_e))
+        out , _ = self.decoder(out, (h_d, c_d))
         out = self.fc(out)
         return out
-            # out_i = F.log_softmax(out)
-            # result.append(self.fc(out_i))
-            
-        # return result
+
 
 if __name__ == '__main__':
 
@@ -61,33 +73,45 @@ if __name__ == '__main__':
     num_classes = 1834
     input_size = 1
     parser = argparse.ArgumentParser()
+    parser.add_argument('-dataset', type=str, default='hd', choices=['hd', 'bgl'])
     parser.add_argument('-num_layers', default=2, type=int)
     parser.add_argument('-hidden_size', default=128, type=int)
     parser.add_argument('-window_size', default=20, type=int)
     parser.add_argument('-epoch', default=100, type=int)
-    parser.add_argument('-error', default=0.1, type=float)
-
+    parser.add_argument('-error_threshold', default=0.1, type=float)
+    parser.add_argument('-capture', type=str, default='')
     args = parser.parse_args()
     num_layers = args.num_layers
     hidden_size = args.hidden_size
     window_size = args.window_size
     num_epochs = args.epoch
-    error = args.error
+    threshold = args.error_threshold
 
-    model = AE(input_size, hidden_size, num_layers, num_classes, window_size).to(device)
-
-    log = 'model/window_size='+str(window_size) \
-    +'_hidden_size='+str(hidden_size)+'_num_layer='+str(num_layers)+\
-     '_epoch=' + str(num_epochs)
-    log = log + '_ae.pt' 
+    log = 'model/' + \
+    'dataset=' + args.dataset + \
+    '_window_size=' + str(window_size) + \
+    '_hidden_size=' + str(hidden_size) + \
+    '_num_layer=' + str(num_layers) + \
+    '_epoch=' + str(num_epochs)
+    log = log + '_ae' + args.capture + '.pt' 
 
     model.load_state_dict(torch.load(log))
     model.eval()
+
     criterion = nn.CrossEntropyLoss()
-    test_normal_loader = generate('normal_test.txt', window_size)
-    test_abnormal_loader = generate('abnormal_test.txt', window_size)
+    if args.dataset == 'hdfs':
+        test_normal_loader = generate_hdfs('hdfs_test_normal', window_size)
+        test_abnormal_loader = generate_hdfs('hdfs_test_abnormal', window_size)
+        num_classes = 28
+    elif args.dataset == 'bgl':
+        test_normal_loader = generate('normal_test.txt', window_size)
+        test_abnormal_loader = generate('abnormal_test.txt', window_size)
+        num_classes = 1834
     len_normal = len(test_normal_loader)
     len_abnormal = len(test_abnormal_loader)
+
+    model = AE(input_size, hidden_size, num_layers, num_classes, window_size).to(device)
+
     TP = 0
     FP = 0
     # Test the model
@@ -103,7 +127,7 @@ if __name__ == '__main__':
             loss = 0
             for i in range(window_size):
                 loss += criterion(output[:,i,:], label[:,i]).item()
-            if loss > error:
+            if loss > threshold:
                 FP += 1
             normal_error +=loss
 
@@ -119,7 +143,7 @@ if __name__ == '__main__':
             loss = 0
             for i in range(window_size):
                 loss += criterion(output[:,i,:], label[:,i]).item()
-            if loss > error:
+            if loss > threshold:
                 TP += 1
             abnormal_error += loss
 
@@ -127,6 +151,7 @@ if __name__ == '__main__':
     print(normal_error/len_normal)
     print('abnormal_avg_error:')
     print(abnormal_error/len_abnormal)
+
     # Compute precision, recall and F1-measure
     FN = len(test_abnormal_loader) - TP
     P = 100 * TP / (TP + FP)
