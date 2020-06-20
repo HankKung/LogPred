@@ -97,8 +97,8 @@ if __name__ == '__main__':
         test_abnormal_loader = generate_hdfs('hdfs_test_abnormal', window_size)
         num_classes = 28
     elif args.dataset == 'bgl':
-        test_normal_loader = generate('normal_test.txt', window_size)
-        test_abnormal_loader = generate('abnormal_test.txt', window_size)
+        test_normal_loader = generate_bgl('normal_test.txt', window_size)
+        test_abnormal_loader = generate_bgl('abnormal_test.txt', window_size)
         num_classes = 1834
     num_classes +=1
     len_normal = len(test_normal_loader)
