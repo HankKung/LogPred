@@ -83,7 +83,3 @@ print(time_start)
 print(time_end)
 print(time_interval)
 print(time_split)
-
-for i in normal_train_key:
-	print(i)
-	break
