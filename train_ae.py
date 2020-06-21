@@ -78,7 +78,7 @@ class AE(nn.Module):
 if __name__ == '__main__':
 
     # Hyperparameters
-    batch_size = 4096
+    batch_size = 2048
     input_size = 1
     model_dir = 'model'
     
@@ -88,7 +88,7 @@ if __name__ == '__main__':
     parser.add_argument('-window_size', default=20, type=int)
     parser.add_argument('-dataset', type=str, default='hd', choices=['hd', 'bgl'])
     parser.add_argument('-epoch', default=150, type=int)
-    parser.add_argument('-capture', type=str, default='')
+    parser.add_argument('-caption', type=str, default='')
     args = parser.parse_args()
     num_layers = args.num_layers
     hidden_size = args.hidden_size
@@ -98,19 +98,21 @@ if __name__ == '__main__':
     if args.dataset == 'hd':
         seq_dataset = generate_hdfs(window_size)
         num_classes = 28
+        # for -1 padding during testing
+        num_classes +=1
     elif args.dataset == 'bgl':
         seq_dataset = generate_bgl(window_size)
         num_classes = 1834
-    num_classes +=1
+    
     dataloader = DataLoader(seq_dataset, batch_size=batch_size, shuffle=True, pin_memory=True)
 
 
     log = 'dataset='+ str(args.dataset) + \
-    'window_size=' + str(window_size) + \
+    '_window_size=' + str(window_size) + \
     '_hidden_size=' + str(hidden_size) + \
     '_num_layer=' + str(num_layers) + \
      '_epoch=' + str(num_epochs)
-    log = log + '_ae' + args.capture
+    log = log + '_ae' + args.caption
     writer = SummaryWriter(log_dir='log/' + log)
 
     model = AE(input_size, hidden_size, num_layers, num_classes, window_size)

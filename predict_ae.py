@@ -74,7 +74,7 @@ if __name__ == '__main__':
     parser.add_argument('-window_size', default=20, type=int)
     parser.add_argument('-epoch', default=100, type=int)
     parser.add_argument('-error_threshold', default=0.1, type=float)
-    parser.add_argument('-capture', type=str, default='')
+    parser.add_argument('-caption', type=str, default='')
     args = parser.parse_args()
     num_layers = args.num_layers
     hidden_size = args.hidden_size
@@ -89,18 +89,19 @@ if __name__ == '__main__':
     '_hidden_size=' + str(hidden_size) + \
     '_num_layer=' + str(num_layers) + \
     '_epoch=' + str(num_epochs)
-    log = log + '_ae' + args.capture + '.pt' 
+    log = log + '_ae' + args.caption + '.pt' 
 
     criterion = nn.CrossEntropyLoss()
     if args.dataset == 'hd':
         test_normal_loader = generate_hdfs('hdfs_test_normal', window_size)
         test_abnormal_loader = generate_hdfs('hdfs_test_abnormal', window_size)
         num_classes = 28
+        num_classes +=1
     elif args.dataset == 'bgl':
         test_normal_loader = generate_bgl('normal_test.txt', window_size)
         test_abnormal_loader = generate_bgl('abnormal_test.txt', window_size)
         num_classes = 1834
-    num_classes +=1
+    
     len_normal = len(test_normal_loader)
     len_abnormal = len(test_abnormal_loader)
 
