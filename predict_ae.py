@@ -28,8 +28,8 @@ def generate_hdfs(name, window_size):
     with open('data/' + name, 'r') as f:
         for line in f.readlines():
             line = list(map(lambda n: n - 1, map(int, line.strip().split())))
-            ### pad -1 if the sequence len is less than the window_size
-            line = line + [-1] * (window_size + 1 - len(line))
+            ### pad 28 if the sequence len is less than the window_size (log key start from 0 to 27)
+            line = line + [28] * (window_size + 1 - len(line))
             for i in range(len(line) - window_size):
                 seq = line[i:i + window_size]
                 hdfs.append(tuple(seq))
@@ -69,10 +69,16 @@ if __name__ == '__main__':
     # Hyperparameters
     parser = argparse.ArgumentParser()
     parser.add_argument('-dataset', type=str, default='hd', choices=['hd', 'bgl'])
+
+    # model parameters
     parser.add_argument('-num_layers', default=2, type=int)
     parser.add_argument('-hidden_size', default=128, type=int)
     parser.add_argument('-window_size', default=20, type=int)
+
+    # training parameters
     parser.add_argument('-epoch', default=100, type=int)
+    parser.add_argument('-lr', default=0.001, type=float)
+
     parser.add_argument('-error_threshold', default=0.1, type=float)
     parser.add_argument('-caption', type=str, default='')
     args = parser.parse_args()
@@ -89,6 +95,7 @@ if __name__ == '__main__':
     '_hidden_size=' + str(hidden_size) + \
     '_num_layer=' + str(num_layers) + \
     '_epoch=' + str(num_epochs)
+    log = log + '_lr=' + str(args.lr) if args.lr != 0.001 else log
     log = log + '_ae' + args.caption + '.pt' 
 
     criterion = nn.CrossEntropyLoss()

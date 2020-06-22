@@ -88,6 +88,7 @@ if __name__ == '__main__':
     parser.add_argument('-window_size', default=20, type=int)
     parser.add_argument('-dataset', type=str, default='hd', choices=['hd', 'bgl'])
     parser.add_argument('-epoch', default=150, type=int)
+    parser.add_argument('-lr', default=0.001, type=float)
     parser.add_argument('-caption', type=str, default='')
     args = parser.parse_args()
     num_layers = args.num_layers
@@ -112,7 +113,10 @@ if __name__ == '__main__':
     '_hidden_size=' + str(hidden_size) + \
     '_num_layer=' + str(num_layers) + \
      '_epoch=' + str(num_epochs)
+    log = log + '_lr=' + str(args.lr) if args.lr != 0.001 else log
     log = log + '_ae' + args.caption
+    print('store model at:')
+    print(log)
     writer = SummaryWriter(log_dir='log/' + log)
 
     model = AE(input_size, hidden_size, num_layers, num_classes, window_size)
@@ -120,7 +124,7 @@ if __name__ == '__main__':
 
     # Loss and optimizer
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters())
+    optimizer = optim.Adam(model.parameters(), lr=args.lr)
 
     # Train the model
     total_step = len(dataloader)

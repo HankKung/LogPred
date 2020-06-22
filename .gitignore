@@ -3,3 +3,9 @@
 model/.DS_Store
 bgl/data.numbers
 bgl/data.csv
+bgl/window_20future_0/normal_train.txt
+bgl/window_20future_0/abnormal_test.txt
+bgl/window_20future_0/normal_test.txt
+bgl/window_20future_1/abnormal_test.txt
+bgl/window_20future_1/normal_test.txt
+bgl/window_20future_1/normal_train.txt
