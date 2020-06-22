@@ -18,5 +18,7 @@
 
 ## References
 [1] : [DeepLog](https://www.cs.utah.edu/~lifeifei/papers/deeplog.pdf)
+
 [2] : [Thanks for wuyifan18's PyTorch Inplementation of DeepLog](https://github.com/wuyifan18/DeepLog)
+
 [2] : [Thanks for Drain Paser Inplementation](https://github.com/logpai/logparser)
