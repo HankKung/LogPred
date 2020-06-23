@@ -25,4 +25,4 @@
 
 [3] : [Thanks for Drain Paser Inplementation](https://github.com/logpai/logparser)
 
-[4]: [LogAnomaly](https://www.ijcai.org/Proceedings/2019/0658.pdf)
+[4] : [LogAnomaly](https://www.ijcai.org/Proceedings/2019/0658.pdf)
