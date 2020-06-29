@@ -21,8 +21,10 @@
 ## References
 [1] : [DeepLog](https://www.cs.utah.edu/~lifeifei/papers/deeplog.pdf)
 
-[2] : [Thanks for wuyifan18's PyTorch Inplementation of DeepLog](https://github.com/wuyifan18/DeepLog)
+[2] : [Thanks for wuyifan18's PyTorch Implementation of DeepLog](https://github.com/wuyifan18/DeepLog)
 
 [3] : [Thanks for Drain Paser Inplementation](https://github.com/logpai/logparser)
 
-[4] : [LogAnomaly](https://www.ijcai.org/Proceedings/2019/0658.pdf)
+[4] : [Thanks for VAE Implementation](https://github.com/tejaslodaya/timeseries-clustering-vae)
+
+[5] : [LogAnomaly](https://www.ijcai.org/Proceedings/2019/0658.pdf)
