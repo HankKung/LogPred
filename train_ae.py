@@ -49,15 +49,17 @@ def generate_hdfs(window_size):
     return dataset
 
 class AE(nn.Module):
-    def __init__(self, input_size, hidden_size, num_layers, num_keys, seq_len):
+    def __init__(self, input_size, hidden_size, latent, num_layers, num_keys, seq_len):
         super(AE, self).__init__()
         self.hidden_size = hidden_size
         self.num_layers = num_layers
         self.seq_len = seq_len
         self.encoder = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)
-        self.decoder = nn.LSTM(hidden_size, hidden_size, num_layers, batch_first=True)
+        self.compress_e = nn.Linear(hidden_size, latent)
+        self.compress_d = nn.Linear(latent, hidden_size)
+        self.decoder = nn.LSTM(1, hidden_size, num_layers)
         self.fc = nn.Linear(hidden_size, num_keys)
-
+        self.relu = nn.ReLU()
         size = 0
         for p in self.parameters():
             size += p.nelement()
@@ -66,12 +68,18 @@ class AE(nn.Module):
     def forward(self, x):
         h_e = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(device)
         c_e = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(device)
-
-        h_d = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(device)
+        decoder_inputs = torch.zeros(self.seq_len, x.shape[0], 1, requires_grad=True).type(torch.FloatTensor).cuda()
         c_d = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(device)
 
-        out, _ = self.encoder(x, (h_e, c_e))
-        out , _ = self.decoder(out, (h_d, c_d))
+        _, (h_e, _) = self.encoder(x, (h_e, c_e))
+        h_e = h_e[-1,:,:]
+        h_e = self.compress_e(h_e)
+        h_e = self.relu(h_e)
+        h_e = self.compress_d(h_e)
+
+        h_e = torch.stack([h_e for _ in range(self.num_layers)])
+        out , _ = self.decoder(decoder_inputs, (h_e, c_d))
+        out = out.permute(1,0,2)
         out = self.fc(out)
         return out
 
@@ -85,6 +93,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-num_layers', default=2, type=int)
     parser.add_argument('-hidden_size', default=128, type=int)
+    parser.add_argument('-latent_length', default=20, type=int)
     parser.add_argument('-window_size', default=20, type=int)
     parser.add_argument('-dataset', type=str, default='hd', choices=['hd', 'bgl'])
     parser.add_argument('-epoch', default=150, type=int)
@@ -93,6 +102,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     num_layers = args.num_layers
     hidden_size = args.hidden_size
+    latent_length = args.latent_length
     window_size = args.window_size
     num_epochs = args.epoch
 
@@ -111,6 +121,7 @@ if __name__ == '__main__':
     log = 'dataset='+ str(args.dataset) + \
     '_window_size=' + str(window_size) + \
     '_hidden_size=' + str(hidden_size) + \
+    '_latent_length=' + str(latent_length) + \
     '_num_layer=' + str(num_layers) + \
      '_epoch=' + str(num_epochs)
     log = log + '_lr=' + str(args.lr) if args.lr != 0.001 else log
@@ -119,13 +130,16 @@ if __name__ == '__main__':
     print(log)
     writer = SummaryWriter(log_dir='log/' + log)
 
-    model = AE(input_size, hidden_size, num_layers, num_classes, window_size)
+
+    model = AE(input_size, hidden_size, latent_length, num_layers, num_classes, window_size)
     model = model.to(device)
 
     # Loss and optimizer
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
-
+    best_loss = 100.0
+    if not os.path.isdir(model_dir):
+        os.makedirs(model_dir)
     # Train the model
     total_step = len(dataloader)
     for epoch in range(num_epochs):  # Loop over the dataset multiple times
@@ -136,21 +150,27 @@ if __name__ == '__main__':
             seq = seq.clone().detach().view(-1, window_size, input_size).to(device)
             label = label.to(device)
             output = model(seq)
-            loss = 0
-
-            for i in range(window_size):
-                loss += criterion(output[:,i,:], label[:,i])
+            # output= torch.reshape(output,(-1,num_classes,window_size))
+            output = output.permute(0,2,1)
+            # print(output.shape)
+            # print(label.shape)
+            
+            loss = criterion(output, label)
+            # loss = 0
+            # for i in range(window_size):
+            #     loss += criterion(output[:,i,:], label[:,i])
 
             optimizer.zero_grad()
             loss.backward()
             train_loss += loss.item()
             optimizer.step()
             tbar.set_description('Train loss: %.3f' % (train_loss / (step + 1)))
+
         print('Epoch [{}/{}], train_loss: {:.4f}'.format(epoch + 1, num_epochs, train_loss / total_step))
         writer.add_scalar('train_loss', train_loss / total_step, epoch + 1)
+        if train_loss < best_loss and epoch > int(num_epochs*0.9):
+            best_loss = train_loss
+            torch.save(model.state_dict(), model_dir + '/' + log + '.pt')
 
-    if not os.path.isdir(model_dir):
-        os.makedirs(model_dir)
-    torch.save(model.state_dict(), model_dir + '/' + log + '.pt')
     writer.close()
     print('Finished Training')
