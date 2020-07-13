@@ -8,6 +8,7 @@ from torch.utils.data import TensorDataset, DataLoader
 import argparse
 from tqdm import tqdm
 import os
+from ae.ae import AE
 
 # Device configuration
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -48,40 +49,6 @@ def generate_hdfs(window_size):
     dataset = TensorDataset(torch.tensor(inputs, dtype=torch.float), torch.tensor(outputs))
     return dataset
 
-class AE(nn.Module):
-    def __init__(self, input_size, hidden_size, latent, num_layers, num_keys, seq_len):
-        super(AE, self).__init__()
-        self.hidden_size = hidden_size
-        self.num_layers = num_layers
-        self.seq_len = seq_len
-        self.encoder = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)
-        self.compress_e = nn.Linear(hidden_size, latent)
-        self.compress_d = nn.Linear(latent, hidden_size)
-        self.decoder = nn.LSTM(1, hidden_size, num_layers)
-        self.fc = nn.Linear(hidden_size, num_keys)
-        self.relu = nn.ReLU()
-        size = 0
-        for p in self.parameters():
-            size += p.nelement()
-        print('Total param size: {}'.format(size))
-
-    def forward(self, x):
-        h_e = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(device)
-        c_e = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(device)
-        decoder_inputs = torch.zeros(self.seq_len, x.shape[0], 1, requires_grad=True).type(torch.FloatTensor).cuda()
-        c_d = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(device)
-
-        _, (h_e, _) = self.encoder(x, (h_e, c_e))
-        h_e = h_e[-1,:,:]
-        h_e = self.compress_e(h_e)
-        h_e = self.relu(h_e)
-        h_e = self.compress_d(h_e)
-
-        h_e = torch.stack([h_e for _ in range(self.num_layers)])
-        out , _ = self.decoder(decoder_inputs, (h_e, c_d))
-        out = out.permute(1,0,2)
-        out = self.fc(out)
-        return out
 
 if __name__ == '__main__':
 

@@ -4,6 +4,7 @@ import torch.nn.functional as F
 import time
 import argparse
 from tqdm import tqdm
+from ae.ae import AE
 
 # Device configuration
 device = torch.device("cuda")
@@ -36,43 +37,6 @@ def generate_hdfs(name, window_size):
     print('Number of sessions({}): {}'.format(name, len(hdfs)))
     return hdfs
 
-class AE(nn.Module):
-    def __init__(self, input_size, hidden_size, latent, num_layers, num_keys, seq_len):
-        super(AE, self).__init__()
-        self.hidden_size = hidden_size
-        self.num_layers = num_layers
-        self.seq_len = seq_len
-        self.encoder = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)
-        self.decoder = nn.LSTM(1, hidden_size, num_layers)
-        self.compress_e = nn.Linear(hidden_size, latent)
-        self.compress_d = nn.Linear(latent, hidden_size)
-        self.relu = nn.ReLU()
-        self.fc = nn.Linear(hidden_size, num_keys)
-
-        size = 0
-        for p in self.parameters():
-            size += p.nelement()
-        print('Total param size: {}'.format(size))
-
-    def forward(self, x):
-        batch_size = x.size(0)
-        h_e = torch.zeros(self.num_layers, batch_size, self.hidden_size).to(device)
-        c_e = torch.zeros(self.num_layers, batch_size, self.hidden_size).to(device)
-
-        decoder_inputs = torch.zeros(self.seq_len, batch_size, 1, requires_grad=True).type(torch.FloatTensor).cuda()
-
-        _, (h_e, _) = self.encoder(x, (h_e, c_e))
-        h_e = h_e[-1,:,:]
-        h_e = self.compress_e(h_e)
-        h_e = self.relu(h_e)
-        h_e = self.compress_d(h_e)
-        h_e = torch.stack([h_e for _ in range(self.num_layers)])
-        c_d = torch.zeros(self.num_layers, batch_size, self.hidden_size).to(device)
-        out , _ = self.decoder(decoder_inputs, (h_e, c_d))
-
-        out = out.permute(1,0,2)
-        out = self.fc(out)
-        return out
 
 if __name__ == '__main__':
 
