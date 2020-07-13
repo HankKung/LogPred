@@ -73,6 +73,8 @@ if __name__ == '__main__':
 
     # k-means
     parser.add_argument('-k', default=10, type=int)
+    parser.add_argument('-iter', default=10, type=int)
+
     args = parser.parse_args()
     num_layers = args.num_layers
     hidden_size = args.hidden_size
@@ -80,6 +82,7 @@ if __name__ == '__main__':
     window_size = args.window_size
     num_epochs = args.epoch
     k = args.k
+    max_iter = args.iter 
 
     if args.dataset == 'hd':
         seq_dataset = generate_hdfs(window_size)
@@ -108,12 +111,14 @@ if __name__ == '__main__':
 
     model = AE(input_size, hidden_size, latent_length, num_layers, num_classes, window_size)
     model = model.to(device)
+    model.eval()
 
-    k = KMEANS(n_clusters=k, max_iter=10, verbose=True, device=device)
 
-    k_means_path = model_path + log[:-3] + '/'
-    # if not os.path.isdir(k_means_path):
-    os.makedirs(k_means_path)
+    k = KMEANS(n_clusters=k, max_iter=max_iter, verbose=True, device=device)
+
+    k_means_path = log[:-3] + '_' +str(k) + '/'
+    if not os.path.isdir(k_means_path):
+        os.makedirs(k_means_path)
 
     all_vector = torch.empty((0, latent_length)).to(device)
     total_step = len(dataloader)
@@ -125,13 +130,13 @@ if __name__ == '__main__':
         all_vector = torch.cat([all_vector, latent_vector], (0))
 
     store_vector = all_vector.cpu().data.numpy()
-    np.save(k_means_path + 'latent_vector.npy', store_vector)
+    np.save(k_means_path + 'latent_vector', store_vector)
 
     k.fit(all_vector)
 
     for i, center in enumerate(k.centers):
         center_store = center.cpu().data.numpy()
         np.save(k_means_path + 'center_' + str(i), center_store)
-        print(center_store)
+        # print(center_store)
 
 

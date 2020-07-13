@@ -24,7 +24,7 @@ class AE(nn.Module):
     def forward(self, x):
         h_e = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(device)
         c_e = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(device)
-        decoder_inputs = torch.zeros(self.seq_len, x.shape[0], 1, requires_grad=True).type(torch.FloatTensor).cuda()
+        decoder_inputs = torch.zeros(self.seq_len, x.shape[0], 1, requires_grad=False).type(torch.FloatTensor).cuda()
         c_d = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(device)
 
         _, (h_e, _) = self.encoder(x, (h_e, c_e))
@@ -42,7 +42,7 @@ class AE(nn.Module):
     def get_latent(self, x):
         h_e = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(device)
         c_e = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(device)
-        decoder_inputs = torch.zeros(self.seq_len, x.shape[0], 1, requires_grad=True).type(torch.FloatTensor).cuda()
+        decoder_inputs = torch.zeros(self.seq_len, x.shape[0], 1, requires_grad=False).type(torch.FloatTensor).cuda()
         c_d = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(device)
 
         _, (h_e, _) = self.encoder(x, (h_e, c_e))
@@ -76,7 +76,7 @@ class KMEANS:
             self.update_center(x)
             if self.verbose:
                 print(self.variation, torch.argmin(self.dists, (0)))
-            if torch.abs(self.variation) < 1e-3 and self.max_iter is None:
+            if torch.abs(self.variation) < 1e-2 and self.max_iter is None:
                 break
             elif self.max_iter is not None and self.count == self.max_iter:
                 break
