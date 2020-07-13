@@ -111,10 +111,11 @@ if __name__ == '__main__':
 
     model = AE(input_size, hidden_size, latent_length, num_layers, num_classes, window_size)
     model = model.to(device)
+    model.load_state_dict(torch.load(log))
     model.eval()
 
 
-    k = KMEANS(n_clusters=k, max_iter=max_iter, verbose=True, device=device)
+    k_means = KMEANS(n_clusters=k, max_iter=max_iter, verbose=True, device=device)
 
     k_means_path = log[:-3] + '_' +str(k) + '/'
     if not os.path.isdir(k_means_path):
@@ -132,9 +133,9 @@ if __name__ == '__main__':
     store_vector = all_vector.cpu().data.numpy()
     np.save(k_means_path + 'latent_vector', store_vector)
 
-    k.fit(all_vector)
+    k_means.fit(all_vector)
 
-    for i, center in enumerate(k.centers):
+    for i, center in enumerate(k_means.centers):
         center_store = center.cpu().data.numpy()
         np.save(k_means_path + 'center_' + str(i), center_store)
         # print(center_store)

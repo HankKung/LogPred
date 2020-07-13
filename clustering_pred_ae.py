@@ -105,6 +105,7 @@ if __name__ == '__main__':
 
     model = AE(input_size, hidden_size, latent_length, num_layers, num_classes, window_size)
     model = model.to(device)
+    model.load_state_dict(torch.load(log))
     model.eval()
 
     k_means_path = log[:-3] + '_' + str(k) + '/'
@@ -113,6 +114,7 @@ if __name__ == '__main__':
     for i in range(k):
         cluster = np.load(k_means_path + 'center_' + str(i) + '.npy')
         cluster = torch.from_numpy(cluster).cuda()
+        # print(cluster.data)
         clusters.append(cluster)
 
     TP = 0
@@ -122,12 +124,9 @@ if __name__ == '__main__':
     with torch.no_grad():
         normal_min_dist = 0.0
         for index, line in enumerate(tbar):
-
             seq = torch.tensor(line, dtype=torch.float).view(-1, window_size, input_size).to(device)
             latent = model.get_latent(seq)
-
             min_dist = 100.0
-            TN = False
             for i, cluster in enumerate(clusters):
                 dist = torch.sqrt(torch.sum(torch.mul(latent - cluster, latent - cluster)))
                 min_dist = dist.item() if dist.item() < min_dist else min_dist
@@ -140,7 +139,6 @@ if __name__ == '__main__':
     with torch.no_grad():
         abnormal_min_dist = 0.0
         for index, line in enumerate(tbar):
-
             seq = torch.tensor(line, dtype=torch.float).view(-1, window_size, input_size).to(device)
             latent = model.get_latent(seq)
             min_dist = 100.0
