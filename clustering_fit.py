@@ -10,7 +10,9 @@ from tqdm import tqdm
 import os
 import numpy as np
 from ae.ae import AE, KMEANS
-
+from vae.vae import VRAE
+from sklearn.manifold import TSNE
+from pathlib import Path
 # Device configuration
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -60,6 +62,7 @@ if __name__ == '__main__':
     
     parser = argparse.ArgumentParser()
     # ae
+    parser.add_argument('-model', type=str, default='ae', choices=['ae', 'vae'])
     parser.add_argument('-num_layers', default=2, type=int)
     parser.add_argument('-hidden_size', default=128, type=int)
     parser.add_argument('-latent_length', default=20, type=int)
@@ -104,12 +107,20 @@ if __name__ == '__main__':
     '_num_layer=' + str(num_layers) + \
     '_epoch=' + str(num_epochs)
     log = log + '_lr=' + str(args.lr) if args.lr != 0.001 else log
-    log = log + '_ae' + args.caption + '.pt' 
+    log = log + '_' + args.model + args.caption + '.pt' 
     print('store model at:')
     print(log)
 
+    if args.model == 'ae':
+        model = AE(input_size, hidden_size, latent_length, num_layers, num_classes, window_size)
+    else:
+        model = VRAE(sequence_length=window_size,
+            number_of_features=1,
+            num_classes=num_classes,
+            hidden_size=hidden_size,
+            latent_length=latent_length,
+            training=False)
 
-    model = AE(input_size, hidden_size, latent_length, num_layers, num_classes, window_size)
     model = model.to(device)
     model.load_state_dict(torch.load(log))
     model.eval()
@@ -131,9 +142,14 @@ if __name__ == '__main__':
         all_vector = torch.cat([all_vector, latent_vector], (0))
 
     store_vector = all_vector.cpu().data.numpy()
-    np.save(k_means_path + 'latent_vector', store_vector)
+    embedded = Path(k_means_path + 'embedded_vector.npy')
+    if not embedded.is_file():
+        z_run_tsne = TSNE(perplexity=80, min_grad_norm=1E-12, n_iter=3000).fit_transform(store_vector)
+        np.save(k_means_path + 'embedded_vector', z_run_tsne)
+    else:
+        z_run_tsne = np.load('embedded_vector.npy')
+    k_means.fit(torch.from_numpy(z_run_tsne).cuda())
 
-    k_means.fit(all_vector)
 
     for i, center in enumerate(k_means.centers):
         center_store = center.cpu().data.numpy()

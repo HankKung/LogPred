@@ -10,6 +10,8 @@ from tqdm import tqdm
 import os
 import numpy as np
 from ae.ae import AE, KMEANS
+from vae.vae import VRAE
+
 
 # Device configuration
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -52,6 +54,7 @@ if __name__ == '__main__':
     
     parser = argparse.ArgumentParser()
     # ae
+    parser.add_argument('-model', type=str, default='ae', choices=['ae', 'vae'])
     parser.add_argument('-num_layers', default=2, type=int)
     parser.add_argument('-hidden_size', default=128, type=int)
     parser.add_argument('-latent_length', default=20, type=int)
@@ -77,15 +80,17 @@ if __name__ == '__main__':
     threshold = args.threshold
 
     if args.dataset == 'hd':
+        train_normal_loader = generate_hdfs('hdfs_train', window_size)
         test_normal_loader = generate_hdfs('hdfs_test_normal', window_size)
         test_abnormal_loader = generate_hdfs('hdfs_test_abnormal', window_size)
         num_classes = 28
-        num_classes +=1
+        num_classes += 1
     elif args.dataset == 'bgl':
         test_normal_loader = generate_bgl('normal_test.txt', window_size)
         test_abnormal_loader = generate_bgl('abnormal_test.txt', window_size)
         num_classes = 1834
     
+    len_train_normal = len(train_normal_loader)
     len_normal = len(test_normal_loader)
     len_abnormal = len(test_abnormal_loader)
 
@@ -98,12 +103,21 @@ if __name__ == '__main__':
     '_num_layer=' + str(num_layers) + \
     '_epoch=' + str(num_epochs)
     log = log + '_lr=' + str(args.lr) if args.lr != 0.001 else log
-    log = log + '_ae' + args.caption + '.pt' 
+    log = log + '_' + args.model + args.caption + '.pt' 
     print('store model at:')
     print(log)
 
 
-    model = AE(input_size, hidden_size, latent_length, num_layers, num_classes, window_size)
+    if args.model == 'ae':
+        model = AE(input_size, hidden_size, latent_length, num_layers, num_classes, window_size)
+    else:
+        model = VRAE(sequence_length=window_size,
+            number_of_features=1,
+            num_classes=num_classes,
+            hidden_size=hidden_size,
+            latent_length=latent_length,
+            training=False)
+
     model = model.to(device)
     model.load_state_dict(torch.load(log))
     model.eval()
@@ -116,6 +130,25 @@ if __name__ == '__main__':
         cluster = torch.from_numpy(cluster).cuda()
         # print(cluster.data)
         clusters.append(cluster)
+
+    FP = 0
+    tbar = tqdm(train_normal_loader)
+    with torch.no_grad():
+        normal_min_dist = 0.0
+        for index, line in enumerate(tbar):
+            seq = torch.tensor(line, dtype=torch.float).view(-1, window_size, input_size).to(device)
+            latent = model.get_latent(seq)
+            min_dist = 100.0
+            for i, cluster in enumerate(clusters):
+
+                dist = torch.sqrt(torch.sum(torch.mul(latent - cluster, latent - cluster)))
+                min_dist = dist.item() if dist.item() < min_dist else min_dist
+            if min_dist > threshold:
+                FP += 1
+            normal_min_dist += min_dist
+            tbar.set_description('train normal min dist: %.3f' % (normal_min_dist / (index + 1)))
+    print('accuracy:')
+    print(FP/len_train_normal)
 
     TP = 0
     FP = 0
