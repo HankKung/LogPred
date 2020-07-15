@@ -60,6 +60,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-num_layers', default=2, type=int)
     parser.add_argument('-hidden_size', default=128, type=int)
+    parser.add_argument('-latent_length', default=20, type=int)
     parser.add_argument('-window_size', default=20, type=int)
     parser.add_argument('-dataset', type=str, default='hd', choices=['hd', 'bgl'])
     parser.add_argument('-epoch', default=150, type=int)
@@ -70,6 +71,7 @@ if __name__ == '__main__':
     hidden_size = args.hidden_size
     window_size = args.window_size
     num_epochs = args.epoch
+    latent_length = args.latent_length
 
     if args.dataset == 'hd':
         seq_dataset = generate_hdfs(window_size)
@@ -86,6 +88,7 @@ if __name__ == '__main__':
     log = 'dataset='+ str(args.dataset) + \
     '_window_size=' + str(window_size) + \
     '_hidden_size=' + str(hidden_size) + \
+    '_latent_length=' + str(latent_length) + \
     '_num_layer=' + str(num_layers) + \
      '_epoch=' + str(num_epochs)
     log = log + '_lr=' + str(args.lr) if args.lr != 0.001 else log
@@ -96,15 +99,21 @@ if __name__ == '__main__':
 
 
     model = VRAE(sequence_length=window_size,
-            number_of_features = 1,
-            num_classes = num_classes,
-            hidden_size = hidden_size)
+            number_of_features=1,
+            num_classes=num_classes,
+            hidden_size=hidden_size,
+            latent_length=latent_length,
+            training=True)
     model = model.to(device)
 
     # Loss and optimizer
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
 
+    if not os.path.isdir(model_dir):
+        os.makedirs(model_dir)
+
+    best_loss = 100.0
     # Train the model
     total_step = len(dataloader)
     for epoch in range(num_epochs):  # Loop over the dataset multiple times
@@ -130,8 +139,10 @@ if __name__ == '__main__':
         print('Epoch [{}/{}], train_loss: {:.4f}'.format(epoch + 1, num_epochs, train_loss / total_step))
         writer.add_scalar('train_loss', train_loss / total_step, epoch + 1)
 
-    if not os.path.isdir(model_dir):
-        os.makedirs(model_dir)
-    torch.save(model.state_dict(), model_dir + '/' + log + '.pt')
+        if train_loss < best_loss and epoch > int(num_epochs*0.9):
+            best_loss = train_loss
+            torch.save(model.state_dict(), model_dir + '/' + log + '.pt')
+
+
     writer.close()
     print('Finished Training')

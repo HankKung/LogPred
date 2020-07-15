@@ -45,9 +45,9 @@ class Lambda(nn.Module):
     :param hidden_size: hidden size of the encoder
     :param latent_length: latent vector length
     """
-    def __init__(self, hidden_size, latent_length):
+    def __init__(self, hidden_size, latent_length, training):
         super(Lambda, self).__init__()
-
+        self.training = training
         self.hidden_size = hidden_size
         self.latent_length = latent_length
 
@@ -62,7 +62,6 @@ class Lambda(nn.Module):
         :param cell_output: last hidden state of encoder
         :return: latent vector
         """
-
         self.latent_mean = self.hidden_to_mean(cell_output)
         self.latent_logvar = self.hidden_to_logvar(cell_output)
 
@@ -110,16 +109,24 @@ class Decoder(nn.Module):
         :param latent: latent vector
         :return: outputs consisting of mean and std dev of vector
         """
+        # latent.shape = [batch, latent]
+
         h_state = self.latent_to_hidden(latent)
+        # h_state = [batch,hidden]
         batch_size = h_state.shape[0]
 
         decoder_inputs = torch.zeros(self.sequence_length, batch_size, 1, requires_grad=True).type(self.dtype)
         h_0 = torch.stack([h_state for _ in range(self.hidden_layer_depth)])
+
+        # print(h_0.shape)
         c_0 = torch.zeros(self.hidden_layer_depth, batch_size, self.hidden_size, requires_grad=True).type(self.dtype)
         decoder_output, _ = self.model(decoder_inputs, (h_0, c_0))
+        decoder_output = decoder_output.permute(1,0,2)
 
         out = self.hidden_to_output(decoder_output)
         return out
+
+
 
 def _assert_no_grad(tensor):
     assert not tensor.requires_grad, \
@@ -153,6 +160,7 @@ class VRAE(nn.Module):
                  hidden_size=128,
                  hidden_layer_depth=2,
                  latent_length=20,
+                 training=False,
                  batch_size=2048,
                  learning_rate=0.005,
                  n_epochs=50,
@@ -184,7 +192,8 @@ class VRAE(nn.Module):
                                dropout=dropout_rate)
 
         self.lmbd = Lambda(hidden_size=hidden_size,
-                           latent_length=latent_length)
+                           latent_length=latent_length,
+                           training=training)
 
         self.decoder = Decoder(sequence_length=sequence_length,
                                batch_size = batch_size,
@@ -232,6 +241,11 @@ class VRAE(nn.Module):
         x_decoded = self.decoder(latent)
         return x_decoded, latent
 
+    def get_latent(self, x):
+        cell_output = self.encoder(x)
+        latent = self.lmbd(cell_output)
+        return latent
+
     def _rec(self, x_decoded, x, loss_fn):
         """
         Compute the loss given output x decoded, input x and the specified loss function
@@ -243,11 +257,11 @@ class VRAE(nn.Module):
         latent_mean, latent_logvar = self.lmbd.latent_mean, self.lmbd.latent_logvar
 
         kl_loss = -0.5 * torch.mean(1 + latent_logvar - latent_mean.pow(2) - latent_logvar.exp())
-        x_decoded = x_decoded.view(-1, x_decoded.shape[0], self.num_classes)
+        # x_decoded = x_decoded.view(-1, x_decoded.shape[0], self.num_classes)
+        x_decoded = x_decoded.permute(0,2,1)
         x = x.long().squeeze(2)
-        print(x_decoded.shape)
 
-        print(x.shape)
+
         recon_loss = loss_fn(x_decoded, x)
 
         return kl_loss + recon_loss, recon_loss, kl_loss
