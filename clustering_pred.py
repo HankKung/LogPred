@@ -11,6 +11,7 @@ import os
 import numpy as np
 from ae.ae import AE, KMEANS
 from vae.vae import VRAE
+import random
 
 
 # Device configuration
@@ -42,6 +43,13 @@ def generate_hdfs(name, window_size):
                 seq = line[i:i + window_size]
                 hdfs.add(tuple(seq))
     print('Number of sessions({}): {}'.format(name, len(hdfs)))
+    return hdfs
+
+def generate_random_hdfs(window_size, num_samples):
+    hdfs = []
+    for i in range(num_samples):
+        line = [random.randint(0, 28) for j in range(window_size)]
+        hdfs.append(line)
     return hdfs
 
 
@@ -124,6 +132,8 @@ if __name__ == '__main__':
 
     k_means_path = log[:-3] + '_' + str(k) + '/'
 
+    # normal_embedded 
+
     clusters = []
     for i in range(k):
         cluster = np.load(k_means_path + 'center_' + str(i) + '.npy')
@@ -195,4 +205,17 @@ if __name__ == '__main__':
     F1 = 2 * P * R / (P + R)
     print('false positive (FP): {}, false negative (FN): {}, Precision: {:.3f}%, Recall: {:.3f}%, F1-measure: {:.3f}%'.format(FP, FN, P, R, F1))
     print('Finished Predicting')
+
+    random_hdfs = generate_random_hdfs(window_size, 5)
+    # test random seq
+
+    with torch.no_grad():
+        for index, line in enumerate(random_hdfs):
+            seq = torch.tensor(line, dtype=torch.float).view(-1, window_size, input_size).to(device)
+            latent = model.get_latent(seq)
+            min_dist = 100.0
+            for i, cluster in enumerate(clusters):
+                dist = torch.sqrt(torch.sum(torch.mul(latent - cluster, latent - cluster)))
+                min_dist = dist.item() if dist.item() < min_dist else min_dist
+            print('random seq: ', line, '~~min_distance: ', min_dist)
 

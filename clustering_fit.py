@@ -141,15 +141,15 @@ if __name__ == '__main__':
         latent_vector = model.get_latent(seq)
         all_vector = torch.cat([all_vector, latent_vector], (0))
 
-    store_vector = all_vector.cpu().data.numpy()
-    embedded = Path(k_means_path + 'embedded_vector.npy')
-    if not embedded.is_file():
-        z_run_tsne = TSNE(perplexity=80, min_grad_norm=1E-12, n_iter=3000).fit_transform(store_vector)
-        np.save(k_means_path + 'embedded_vector', z_run_tsne)
-    else:
-        z_run_tsne = np.load('embedded_vector.npy')
-    k_means.fit(torch.from_numpy(z_run_tsne).cuda())
-
+    # store_vector = all_vector.cpu().data.numpy()
+    # embedded = Path(k_means_path + 'embedded_vector.npy')
+    # if not embedded.is_file():
+    #     z_run_tsne = TSNE(perplexity=80, min_grad_norm=1E-12, n_iter=3000).fit_transform(store_vector)
+    #     np.save(k_means_path + 'embedded_vector', z_run_tsne)
+    # else:
+    #     z_run_tsne = np.load('embedded_vector.npy')
+    # k_means.fit(torch.from_numpy(z_run_tsne).cuda())
+    k_means.fit(all_vector)
 
     for i, center in enumerate(k_means.centers):
         center_store = center.cpu().data.numpy()
