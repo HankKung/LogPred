@@ -13,14 +13,14 @@ from vae.vae import VRAE
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
-def generate_bgl(window_size):
+def generate_bgl(name, window_size):
     num_sessions = 0
     inputs = []
     outputs = []
     num_keys = set()
-    with open('bgl/window_'+str(window_size)+'future_0/normal_train.txt', 'r') as f_len:
+    with open('bgl/window_'+str(window_size)+'future_0/' + name, 'r') as f_len:
         file_len = len(f_len.readlines())
-    with open('bgl/window_'+str(window_size)+'future_0/normal_train.txt', 'r') as f:
+    with open('bgl/window_'+str(window_size)+'future_0/' + name, 'r') as f:
         for line in f.readlines():
             num_sessions += 1
             line = tuple(map(lambda n: n, map(int, line.strip().split())))
@@ -28,6 +28,7 @@ def generate_bgl(window_size):
             outputs.append(line)
             for key in line:
                 num_keys.add(key)
+    print(name)
     print('Number of sessions: {}'.format(num_sessions))
     print('number of keys:{}'.format(len(num_keys)))
     dataset = TensorDataset(torch.tensor(inputs, dtype=torch.float), torch.tensor(outputs))
@@ -65,6 +66,7 @@ if __name__ == '__main__':
     parser.add_argument('-dataset', type=str, default='hd', choices=['hd', 'bgl'])
     parser.add_argument('-epoch', default=150, type=int)
     parser.add_argument('-lr', default=0.001, type=float)
+    parser.add_argument('-dropout', default=0.0, type=float)
     parser.add_argument('-caption', type=str, default='')
     args = parser.parse_args()
     num_layers = args.num_layers
@@ -72,6 +74,7 @@ if __name__ == '__main__':
     window_size = args.window_size
     num_epochs = args.epoch
     latent_length = args.latent_length
+    dropout = args.dropout
 
     if args.dataset == 'hd':
         seq_dataset = generate_hdfs(window_size)
@@ -79,18 +82,20 @@ if __name__ == '__main__':
         # for -1 padding during testing
         num_classes +=1
     elif args.dataset == 'bgl':
-        seq_dataset = generate_bgl(window_size)
-        num_classes = 1834
+        seq_dataset = generate_bgl('normal_train.txt', window_size)
+        val_dataset = generate_bgl('abnormal_test.txt', window_size)
+        num_classes = 1848
     
     dataloader = DataLoader(seq_dataset, batch_size=batch_size, shuffle=True, pin_memory=True)
-
+    val_dataset = DataLoader(val_dataset, batch_size=4096, shuffle=False, pin_memory=True)
 
     log = 'dataset='+ str(args.dataset) + \
     '_window_size=' + str(window_size) + \
     '_hidden_size=' + str(hidden_size) + \
     '_latent_length=' + str(latent_length) + \
     '_num_layer=' + str(num_layers) + \
-     '_epoch=' + str(num_epochs)
+    '_epoch=' + str(num_epochs) + \
+    '_dropout=' + str(dropout)
     log = log + '_lr=' + str(args.lr) if args.lr != 0.001 else log
     log = log + '_vae' + args.caption
     print('store model at:')
@@ -103,7 +108,8 @@ if __name__ == '__main__':
             num_classes=num_classes,
             hidden_size=hidden_size,
             latent_length=latent_length,
-            training=True)
+            training=True,
+            dropout_rate=dropout)
     model = model.to(device)
 
     # Loss and optimizer
@@ -113,23 +119,19 @@ if __name__ == '__main__':
     if not os.path.isdir(model_dir):
         os.makedirs(model_dir)
 
-    best_loss = 100.0
     # Train the model
     total_step = len(dataloader)
     for epoch in range(num_epochs):  # Loop over the dataset multiple times
         train_loss = 0
         tbar = tqdm(dataloader)
+        model.train()
         for step, (seq, label) in enumerate(tbar):
             # Forward pass
             seq = seq.clone().detach().view(-1, window_size, input_size).to(device)
             # label = label.to(device)
             # output = model(seq)
-
+            
             loss, rec, kl = model.compute_loss(seq)
-
-            # loss = 0
-            # for i in range(window_size):
-            #     loss += criterion(output[:,i,:], label[:,i])
 
             optimizer.zero_grad()
             loss.backward()
@@ -139,10 +141,19 @@ if __name__ == '__main__':
         print('Epoch [{}/{}], train_loss: {:.4f}'.format(epoch + 1, num_epochs, train_loss / total_step))
         writer.add_scalar('train_loss', train_loss / total_step, epoch + 1)
 
-        if train_loss < best_loss and epoch > int(num_epochs*0.9):
-            best_loss = train_loss
-            torch.save(model.state_dict(), model_dir + '/' + log + '.pt')
+        # if epoch % 20 == 0:
+        #     model.eval()
+        #     val_loss = 0.0
+        #     tbar_val = tqdm(val_dataset)
+        #     for step, (seq, label) in enumerate(tbar_val):
+        #         # Forward pass
+        #         seq = seq.clone().detach().view(-1, window_size, input_size).to(device)
+        #         with torch.no_grad():
+        #             loss, _, _ = model.compute_loss(seq)
 
+        #         val_loss += loss.data.cpu()
+        #         tbar.set_description('val loss: %.3f' % (val_loss / (step + 1)))
 
+    torch.save(model.state_dict(), model_dir + '/' + log + '.pt')
     writer.close()
     print('Finished Training')

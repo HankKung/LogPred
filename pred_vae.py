@@ -6,6 +6,7 @@ import argparse
 from tqdm import tqdm
 from vae.vae import VRAE
 import os
+import random
 
 # Device configuration
 device = torch.device("cuda")
@@ -38,6 +39,13 @@ def generate_hdfs(name, window_size):
     print('Number of sessions({}): {}'.format(name, len(hdfs)))
     return hdfs
 
+def generate_random_hdfs(window_size, num_samples):
+    hdfs = []
+    for i in range(num_samples):
+        line = [random.randint(0, 28) for j in range(window_size)]
+        hdfs.append(line)
+    return hdfs
+
 if __name__ == '__main__':
 
 
@@ -50,6 +58,7 @@ if __name__ == '__main__':
     parser.add_argument('-epoch', default=150, type=int)
     parser.add_argument('-lr', default=0.001, type=float)
     parser.add_argument('-error_threshold', default=0.1, type=float)
+    parser.add_argument('-dropout', default=0.0, type=float)
     parser.add_argument('-caption', type=str, default='')
     args = parser.parse_args()
     num_layers = args.num_layers
@@ -57,6 +66,7 @@ if __name__ == '__main__':
     window_size = args.window_size
     num_epochs = args.epoch
     latent_length = args.latent_length
+    dropout = args.dropout
     threshold = args.error_threshold
 
 
@@ -68,21 +78,27 @@ if __name__ == '__main__':
     '_hidden_size=' + str(hidden_size) + \
     '_latent_length=' + str(latent_length) + \
     '_num_layer=' + str(num_layers) + \
-    '_epoch=' + str(num_epochs)
+    '_epoch=' + str(num_epochs) + \
+    '_dropout=' + str(dropout)
     log = log + '_lr=' + str(args.lr) if args.lr != 0.001 else log
     log = log + '_vae' + args.caption + '.pt' 
+    print('retrieve model from: ', log)
 
     criterion = nn.CrossEntropyLoss()
     if args.dataset == 'hd':
+        random_loader = generate_random_hdfs(window_size, 10000)
+        train_loader = generate_hdfs('hdfs_train', window_size)
         test_normal_loader = generate_hdfs('hdfs_test_normal', window_size)
         test_abnormal_loader = generate_hdfs('hdfs_test_abnormal', window_size)
         num_classes = 28
         num_classes +=1
     elif args.dataset == 'bgl':
+        # train_loader = generate_bgl('normal_train.txt', window_size)
         test_normal_loader = generate_bgl('normal_test.txt', window_size)
         test_abnormal_loader = generate_bgl('abnormal_test.txt', window_size)
-        num_classes = 1834
-    
+        num_classes = 1848
+    # len_random = len(random_loader)
+    # len_train = len(train_loader)
     len_normal = len(test_normal_loader)
     len_abnormal = len(test_abnormal_loader)
 
@@ -90,10 +106,70 @@ if __name__ == '__main__':
             number_of_features = 1,
             num_classes = num_classes,
             hidden_size = hidden_size,
-            latent_length = latent_length)
+            latent_length = latent_length,
+            dropout_rate=dropout)
     model = model.to(device)
     model.load_state_dict(torch.load(log))
     model.eval()
+    
+    # random_loss = 0
+    # tbar = tqdm(random_loader)
+    # with torch.no_grad():
+    #     normal_error = 0.0
+    #     for index, line in enumerate(tbar):
+    #         # print(line)
+    #         seq = torch.tensor(line, dtype=torch.float).view(-1, window_size, input_size).to(device)
+    #         label = torch.tensor(line).to(device)
+    #         output, _ = model(seq)
+    #         output = output.permute(0,2,1)
+    #         label = label.unsqueeze(0)
+    #         loss = criterion(output, label)
+
+    #         random_loss +=loss.item()
+    #     print('random_loss: ', random_loss/len_random)
+
+    # train_FP = 0
+    # train_loss = 0
+    # tbar = tqdm(train_loader)
+    # with torch.no_grad():
+    #     for index, line in enumerate(tbar):
+    #         # print(line)
+    #         line = list(line)
+    #         random.shuffle(line)
+
+    #         line = tuple(line)
+    #         seq = torch.tensor(line, dtype=torch.float).view(-1, window_size, input_size).to(device)
+    #         label = torch.tensor(line).to(device)
+    #         output, _ = model(seq)
+    #         output = output.permute(0,2,1)
+    #         label = label.unsqueeze(0)
+    #         loss = criterion(output, label)
+
+    #         if loss.item() > threshold:
+    #             train_FP += 1
+    #         train_loss +=loss.item()
+    #     print('train_accuracy: ', train_FP/len_train)
+    #     print('train_loss: ', train_loss/len_train)
+
+    # train_FP = 0
+    # train_loss = 0
+    # tbar = tqdm(train_loader)
+    # with torch.no_grad():
+    #     for index, line in enumerate(tbar):
+    #         # print(line)
+    #         seq = torch.tensor(line, dtype=torch.float).view(-1, window_size, input_size).to(device)
+    #         label = torch.tensor(line).to(device)
+    #         output, _ = model(seq)
+    #         output = output.permute(0,2,1)
+    #         label = label.unsqueeze(0)
+    #         loss = criterion(output, label)
+
+    #         if loss.item() > threshold:
+    #             train_FP += 1
+    #         train_loss += loss.item()
+    #     print('train_accuracy:', train_FP/len_train)
+    #     print('train_loss: ', train_loss/len_train)
+
 
     TP = 0
     FP = 0
@@ -102,17 +178,15 @@ if __name__ == '__main__':
     with torch.no_grad():
         normal_error = 0.0
         for index, line in enumerate(tbar):
-
             seq = torch.tensor(line, dtype=torch.float).view(-1, window_size, input_size).to(device)
             label = torch.tensor(line).to(device)
             output, _ = model(seq)
             output = output.permute(0,2,1)
             label = label.unsqueeze(0)
             loss = criterion(output, label)
-
-            if loss.item() > threshold:
+            if loss.data > threshold:
                 FP += 1
-            normal_error +=loss.item()
+            normal_error +=loss.data
             tbar.set_description('normal error: %.3f' % (normal_error / (index + 1)))
 
     tbar = tqdm(test_abnormal_loader)
@@ -127,9 +201,9 @@ if __name__ == '__main__':
             label = label.unsqueeze(0)
             loss = criterion(output, label)
 
-            if loss.item() > threshold:
+            if loss.data > threshold:
                 TP += 1
-            abnormal_error += loss.item()
+            abnormal_error += loss.data
             tbar.set_description('abnormal error: %.3f' % (abnormal_error / (index + 1)))
 
     print('normal_avg_error:')
