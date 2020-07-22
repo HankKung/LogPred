@@ -74,9 +74,11 @@ if __name__ == '__main__':
     '_epoch=' + str(num_epochs)
     log = log + '_lr=' + str(args.lr) if args.lr != 0.001 else log
     log = log + '_ae' + args.caption + '.pt' 
+    print('retrieve model from: ', log)
 
     criterion = nn.CrossEntropyLoss()
     if args.dataset == 'hd':
+        train_loader = generate_hdfs('hdfs_train', window_size)
         test_normal_loader = generate_hdfs('hdfs_test_normal', window_size)
         test_abnormal_loader = generate_hdfs('hdfs_test_abnormal', window_size)
         num_classes = 28
@@ -96,6 +98,21 @@ if __name__ == '__main__':
     TP = 0
     FP = 0
     # Test the model
+    with torch.no_grad():
+        normal_error = 0.0
+        for index, line in enumerate(train_loader):
+
+            seq = torch.tensor(line, dtype=torch.float).view(-1, window_size, input_size).to(device)
+            label = torch.tensor(line).to(device)
+            output = model(seq)
+            output = output.permute(0,2,1)
+            label = label.unsqueeze(0)
+
+            loss = criterion(output, label)
+            if loss.item() > threshold:
+                FP += 1
+            normal_error +=loss.item()
+
     tbar = tqdm(test_normal_loader)
     with torch.no_grad():
         normal_error = 0.0
@@ -106,6 +123,7 @@ if __name__ == '__main__':
             output = model(seq)
             output = output.permute(0,2,1)
             label = label.unsqueeze(0)
+
             loss = criterion(output, label)
 
             if loss.item() > threshold:

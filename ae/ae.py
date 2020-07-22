@@ -5,17 +5,19 @@ import torch.nn.functional as F
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 class AE(nn.Module):
-    def __init__(self, input_size, hidden_size, latent, num_layers, num_keys, seq_len):
+    def __init__(self, input_size, hidden_size, latent, num_layers, num_keys, seq_len, dropout_rate=0.0):
         super(AE, self).__init__()
         self.hidden_size = hidden_size
         self.num_layers = num_layers
         self.seq_len = seq_len
-        self.encoder = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)
+        self.encoder = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True, dropout=dropout_rate)
         self.compress_e = nn.Linear(hidden_size, latent)
         self.compress_d = nn.Linear(latent, hidden_size)
         self.decoder = nn.LSTM(1, hidden_size, num_layers)
         self.fc = nn.Linear(hidden_size, num_keys)
         self.relu = nn.ReLU()
+        nn.init.xavier_uniform_(self.compress_e.weight)
+        nn.init.xavier_uniform_(self.compress_d.weight)
         size = 0
         for p in self.parameters():
             size += p.nelement()
