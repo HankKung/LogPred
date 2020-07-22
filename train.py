@@ -12,7 +12,7 @@ import os
 # Device configuration
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-def generate(name):
+def generate_hd(name):
     num_sessions = 0
     inputs = []
     outputs = []
@@ -67,6 +67,7 @@ class DL(nn.Module):
         h0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(device)
         c0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(device)
         out, _ = self.lstm(x, (h0, c0))
+        # print(out.shape)
         out = self.fc(out[:, -1, :])
         return out
 
@@ -183,7 +184,7 @@ if __name__ == '__main__':
     log = log + '_' + args.model
 
     if args.dataset == 'hd':
-        seq_dataset = generate('hdfs_train')
+        seq_dataset = generate_hd('hdfs_train')
         num_classes = 28
     elif args.dataset == 'bgl':
         seq_dataset = generate_bgl('bgl', window_size)
@@ -221,6 +222,7 @@ if __name__ == '__main__':
             train_loss += loss.item()
             optimizer.step()
             tbar.set_description('Train loss: %.3f' % (train_loss / (step + 1)))
+
         print('Epoch [{}/{}], train_loss: {:.4f}'.format(epoch + 1, num_epochs, train_loss / total_step))
         writer.add_scalar('train_loss', train_loss / total_step, epoch + 1)
 

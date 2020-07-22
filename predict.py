@@ -9,14 +9,13 @@ from tqdm import tqdm
 device = torch.device("cuda")
 
 
-def generate(name, window_size):
-    hdfs = []
+def generate_hd(name, window_size):
+    hdfs = set()
     with open('data/' + name, 'r') as f:
         for ln in f.readlines():
             ln = list(map(lambda n: n - 1, map(int, ln.strip().split())))
             ln = ln + [-1] * (window_size + 1 - len(ln))
-            hdfs.append(tuple(ln))
-            # hdfs.append(tuple(ln))
+            hdfs.add(tuple(ln))
     print('Number of sessions({}): {}'.format(name, len(hdfs)))
     return hdfs
 
@@ -160,8 +159,7 @@ if __name__ == '__main__':
     hidden_size = args.hidden_size
     window_size = args.window_size
     num_candidates = args.num_candidates
-    # model_path = 'model/Adam_batch_size=2048_epoch=300'
-    # model_path = model_path + '_' + args.model + '.pt'
+
     log = 'model/num_layer=' + str(num_layers) + \
     '_window_size=' + str(window_size) + \
     '_hidden=' + str(hidden_size) + \
@@ -171,13 +169,13 @@ if __name__ == '__main__':
     log = log + '.pt'
 
     if args.dataset == 'hd':
-        test_normal_loader = generate('hdfs_test_normal', window_size)
-        test_abnormal_loader = generate('hdfs_test_abnormal', window_size)
+        test_normal_loader = generate_hd('hdfs_test_normal', window_size)
+        test_abnormal_loader = generate_hd('hdfs_test_abnormal', window_size)
         num_classes = 28
     elif args.dataset == 'bgl':
         test_normal_loader = generate_bgl('normal_test.txt', window_size)
         test_abnormal_loader = generate_bgl('abnormal_test.txt', window_size)
-        num_classes = 1834
+        num_classes = 1848
 
     if args.model == 'dl':
         model = DL(input_size, hidden_size, num_layers, num_classes)
