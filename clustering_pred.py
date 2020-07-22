@@ -67,6 +67,7 @@ if __name__ == '__main__':
     parser.add_argument('-hidden_size', default=128, type=int)
     parser.add_argument('-latent_length', default=20, type=int)
     parser.add_argument('-window_size', default=20, type=int)
+    parser.add_argument('-dropout', default=0.0, type=float)
 
     # training
     parser.add_argument('-dataset', type=str, default='hd', choices=['hd', 'bgl'])
@@ -84,6 +85,7 @@ if __name__ == '__main__':
     latent_length = args.latent_length
     window_size = args.window_size
     num_epochs = args.epoch
+    dropout = args.dropout
     k = args.k
     threshold = args.threshold
 
@@ -96,7 +98,7 @@ if __name__ == '__main__':
     elif args.dataset == 'bgl':
         test_normal_loader = generate_bgl('normal_test.txt', window_size)
         test_abnormal_loader = generate_bgl('abnormal_test.txt', window_size)
-        num_classes = 1834
+        num_classes = 1848
     
     len_train_normal = len(train_normal_loader)
     len_normal = len(test_normal_loader)
@@ -109,16 +111,16 @@ if __name__ == '__main__':
     '_hidden_size=' + str(hidden_size) + \
     '_latent_length=' + str(latent_length) + \
     '_num_layer=' + str(num_layers) + \
-    '_epoch=' + str(num_epochs)
+    '_epoch=' + str(num_epochs) + \
+    '_dropout=' + str(dropout)
     log = log + '_lr=' + str(args.lr) if args.lr != 0.001 else log
     log = log + '_' + args.model + args.caption + '.pt' 
-    print('store model at:')
-    print(log)
+    print('retrieve model from: ', log)
 
 
     if args.model == 'ae':
         model = AE(input_size, hidden_size, latent_length, num_layers, num_classes, window_size)
-    else:
+    elif args.model == 'vae':
         model = VRAE(sequence_length=window_size,
             number_of_features=1,
             num_classes=num_classes,
@@ -146,6 +148,9 @@ if __name__ == '__main__':
     with torch.no_grad():
         normal_min_dist = 0.0
         for index, line in enumerate(tbar):
+            line = list(line)
+            line[-1] = random.randint(0, 28)
+            line = tuple(line)
             seq = torch.tensor(line, dtype=torch.float).view(-1, window_size, input_size).to(device)
             latent = model.get_latent(seq)
             min_dist = 100.0
@@ -166,7 +171,11 @@ if __name__ == '__main__':
     tbar = tqdm(test_normal_loader)
     with torch.no_grad():
         normal_min_dist = 0.0
+
         for index, line in enumerate(tbar):
+            line = list(line)
+            line[-1] = random.randint(0, 28)
+            line = tuple(line)
             seq = torch.tensor(line, dtype=torch.float).view(-1, window_size, input_size).to(device)
             latent = model.get_latent(seq)
             min_dist = 100.0
@@ -206,9 +215,11 @@ if __name__ == '__main__':
     print('false positive (FP): {}, false negative (FN): {}, Precision: {:.3f}%, Recall: {:.3f}%, F1-measure: {:.3f}%'.format(FP, FN, P, R, F1))
     print('Finished Predicting')
 
-    random_hdfs = generate_random_hdfs(window_size, 5)
-    # test random seq
 
+    # generate random sequence
+    random_hdfs = generate_random_hdfs(window_size, 10000)
+    # test random seq
+    avg_dist = 0.0
     with torch.no_grad():
         for index, line in enumerate(random_hdfs):
             seq = torch.tensor(line, dtype=torch.float).view(-1, window_size, input_size).to(device)
@@ -217,5 +228,7 @@ if __name__ == '__main__':
             for i, cluster in enumerate(clusters):
                 dist = torch.sqrt(torch.sum(torch.mul(latent - cluster, latent - cluster)))
                 min_dist = dist.item() if dist.item() < min_dist else min_dist
-            print('random seq: ', line, '~~min_distance: ', min_dist)
+            # print('random seq: ', line, '~~min_distance: ', min_dist)
+            avg_dist += min_dist
+        print('average dist ', avg_dist/10000)
 

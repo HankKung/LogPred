@@ -167,6 +167,7 @@ if __name__ == '__main__':
     '_epoch='+str(args.epoch)
     log = log + '_' + args.model
     log = log + '.pt'
+    print('retrieve model from: ', log)
 
     if args.dataset == 'hd':
         test_normal_loader = generate_hd('hdfs_test_normal', window_size)

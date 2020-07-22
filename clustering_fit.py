@@ -39,8 +39,8 @@ def generate_bgl(window_size):
 
 def generate_hdfs(window_size):
     num_sessions = 0
-    inputs = []
-    outputs = []
+    inputs = set()
+    outputs = set()
     with open('data/hdfs_train', 'r') as f:
         for line in f.readlines():
             num_sessions += 1
@@ -67,6 +67,7 @@ if __name__ == '__main__':
     parser.add_argument('-hidden_size', default=128, type=int)
     parser.add_argument('-latent_length', default=20, type=int)
     parser.add_argument('-window_size', default=20, type=int)
+    parser.add_argument('-dropout', default=0.0, type=float)
 
     # training
     parser.add_argument('-dataset', type=str, default='hd', choices=['hd', 'bgl'])
@@ -84,6 +85,7 @@ if __name__ == '__main__':
     latent_length = args.latent_length
     window_size = args.window_size
     num_epochs = args.epoch
+    dropout = args.dropout
     k = args.k
     max_iter = args.iter 
 
@@ -94,7 +96,7 @@ if __name__ == '__main__':
         num_classes +=1
     elif args.dataset == 'bgl':
         seq_dataset = generate_bgl(window_size)
-        num_classes = 1834
+        num_classes = 1848
     
     dataloader = DataLoader(seq_dataset, batch_size=batch_size, shuffle=True, pin_memory=True)
 
@@ -105,11 +107,11 @@ if __name__ == '__main__':
     '_hidden_size=' + str(hidden_size) + \
     '_latent_length=' + str(latent_length) + \
     '_num_layer=' + str(num_layers) + \
-    '_epoch=' + str(num_epochs)
+    '_epoch=' + str(num_epochs) + \
+    '_dropout=' + str(dropout) 
     log = log + '_lr=' + str(args.lr) if args.lr != 0.001 else log
     log = log + '_' + args.model + args.caption + '.pt' 
-    print('store model at:')
-    print(log)
+    print('retrieve model from: ', log)
 
     if args.model == 'ae':
         model = AE(input_size, hidden_size, latent_length, num_layers, num_classes, window_size)
@@ -141,6 +143,7 @@ if __name__ == '__main__':
         latent_vector = model.get_latent(seq)
         all_vector = torch.cat([all_vector, latent_vector], (0))
 
+    # t-SNE
     # store_vector = all_vector.cpu().data.numpy()
     # embedded = Path(k_means_path + 'embedded_vector.npy')
     # if not embedded.is_file():
@@ -149,6 +152,7 @@ if __name__ == '__main__':
     # else:
     #     z_run_tsne = np.load('embedded_vector.npy')
     # k_means.fit(torch.from_numpy(z_run_tsne).cuda())
+
     k_means.fit(all_vector)
 
     for i, center in enumerate(k_means.centers):

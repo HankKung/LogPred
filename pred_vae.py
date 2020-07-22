@@ -111,7 +111,7 @@ if __name__ == '__main__':
     model = model.to(device)
     model.load_state_dict(torch.load(log))
     model.eval()
-    
+
     # random_loss = 0
     # tbar = tqdm(random_loader)
     # with torch.no_grad():
@@ -184,9 +184,9 @@ if __name__ == '__main__':
             output = output.permute(0,2,1)
             label = label.unsqueeze(0)
             loss = criterion(output, label)
-            if loss.data > threshold:
+            if loss.item() > threshold:
                 FP += 1
-            normal_error +=loss.data
+            normal_error +=loss.item()
             tbar.set_description('normal error: %.3f' % (normal_error / (index + 1)))
 
     tbar = tqdm(test_abnormal_loader)
@@ -201,9 +201,9 @@ if __name__ == '__main__':
             label = label.unsqueeze(0)
             loss = criterion(output, label)
 
-            if loss.data > threshold:
+            if loss.item() > threshold:
                 TP += 1
-            abnormal_error += loss.data
+            abnormal_error += loss.item()
             tbar.set_description('abnormal error: %.3f' % (abnormal_error / (index + 1)))
 
     print('normal_avg_error:')
