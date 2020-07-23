@@ -73,7 +73,6 @@ if __name__ == '__main__':
     parser.add_argument('-dataset', type=str, default='hd', choices=['hd', 'bgl'])
     parser.add_argument('-epoch', default=150, type=int)
     parser.add_argument('-lr', default=0.001, type=float)
-    parser.add_argument('-caption', type=str, default='')
 
     # k-means
     parser.add_argument('-k', default=10, type=int)
@@ -114,7 +113,7 @@ if __name__ == '__main__':
     '_epoch=' + str(num_epochs) + \
     '_dropout=' + str(dropout)
     log = log + '_lr=' + str(args.lr) if args.lr != 0.001 else log
-    log = log + '_' + args.model + args.caption + '.pt' 
+    log = log + '_' + args.model + '.pt' 
     print('retrieve model from: ', log)
 
 

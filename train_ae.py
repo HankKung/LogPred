@@ -68,7 +68,6 @@ if __name__ == '__main__':
     parser.add_argument('-epoch', default=150, type=int)
     parser.add_argument('-lr', default=0.001, type=float)
     parser.add_argument('-dropout', default=0.0, type=float)
-    parser.add_argument('-caption', type=str, default='')
     args = parser.parse_args()
     num_layers = args.num_layers
     hidden_size = args.hidden_size
@@ -98,7 +97,7 @@ if __name__ == '__main__':
     '_epoch=' + str(num_epochs) + \
     '_dropout=' + str(dropout)
     log = log + '_lr=' + str(args.lr) if args.lr != 0.001 else log
-    log = log + '_' + args.model + args.caption
+    log = log + '_' + args.model
     print('store model at:')
     print(log)
     writer = SummaryWriter(log_dir='log/' + log)
