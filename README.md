@@ -17,6 +17,17 @@
 | AE | 0.538 |0.848 |0.658 |
 | LogAnnomaly  | 0.96 | 0.94 | 0.95 |
 
+**For DeepLog and its attention variants**
+```
+python train.py -model dl -num_layers 2 -hidden_size 128 -window_size 10 -dataset hd -epoch 300
+python predict.py -model dl -num_layers 2 -hidden_size 128 -window_size 10 -dataset hd -epoch 300 -num_candidates 9
+```
+**For auto-encoder/VAE**
+```
+python train_ae.py -model vae -num_layers 2 -hidden_size 128 -window_size 10 -dataset hd -epoch 300
+python predict_ae.py -model vae -num_layers 2 -hidden_size 128 -window_size 10 -dataset hd -epoch 300 -error_threshold 1.5
+```
+
 
 ## References
 [1] : [DeepLog](https://www.cs.utah.edu/~lifeifei/papers/deeplog.pdf)
