@@ -84,11 +84,11 @@ if __name__ == '__main__':
         num_classes +=1
     elif args.dataset == 'bgl':
         seq_dataset = generate_bgl('normal_train.txt', window_size)
-        val_dataset = generate_bgl('abnormal_test.txt', window_size)
+        # val_dataset = generate_bgl('abnormal_test.txt', window_size)
         num_classes = 1848
     
     dataloader = DataLoader(seq_dataset, batch_size=batch_size, shuffle=True, pin_memory=True)
-    val_dataset = DataLoader(val_dataset, batch_size=4096, shuffle=False, pin_memory=True)
+    
 
     log = 'dataset='+ str(args.dataset) + \
     '_window_size=' + str(window_size) + \
