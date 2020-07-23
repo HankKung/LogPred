@@ -35,9 +35,20 @@ python clustering_pred.py -model vae -num_layers 2 -hidden_size 128 -window_size
 ```
 
 
-BG/L dataset can be downloaded at [here](https://zenodo.org/record/3227177)
+**For BG/L dataset**
+1. BG/L dataset can be downloaded at [here](https://zenodo.org/record/3227177)
 
-Then use [Drain](https://github.com/logpai/logparser/blob/master/demo/Drain_demo.py) to parse it but replace the original one with LogPred/bgl/Drain_demo.py
+2. Use [Drain](https://github.com/logpai/logparser/blob/master/demo/Drain_demo.py) to parse it but replace the original one with LogPred/bgl/Drain_demo.py then one will get two files: BGL.log_structured.csv and BGL.log_templates.csv
+
+3. move BGL.log_structured.csv and BGL.log_templates.csv to Log_Pred/bgl and convert logs into keys with timestamp:
+```
+cd bgl
+python temp2key.py
+```
+4. split the dataset with training (80%), normal validation, and abnormal validation:
+```
+python data_split.py
+```
 
 ## Requirements
 
