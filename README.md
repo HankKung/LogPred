@@ -29,8 +29,9 @@ python predict_ae.py -model vae -num_layers 2 -hidden_size 128 -window_size 10 -
 ```
 
 
-BG/L dataset can be downloaded at https://zenodo.org/record/3227177
-Then use Drain to parse it.
+BG/L dataset can be downloaded at [here](https://zenodo.org/record/3227177)
+
+Then use [Drain](https://github.com/logpai/logparser/blob/master/demo/Drain_demo.py) to parse it but replace the original one with LogPred/bgl/Drain_demo.py
 
 ## Requirements
 
