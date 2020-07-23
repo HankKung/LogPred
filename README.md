@@ -29,6 +29,18 @@ python predict_ae.py -model vae -num_layers 2 -hidden_size 128 -window_size 10 -
 ```
 
 
+BG/L dataset can be downloaded at https://zenodo.org/record/3227177
+Then use Drain to parse it.
+
+## Requirements
+
+* Pytorch version 1.3
+
+* Python 3
+
+Note that the parser Drain requires python 2.7
+
+
 ## References
 [1] : [DeepLog](https://www.cs.utah.edu/~lifeifei/papers/deeplog.pdf)
 
