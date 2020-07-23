@@ -24,9 +24,28 @@ python predict.py -model dl -num_layers 2 -hidden_size 128 -window_size 10 -data
 ```
 **For auto-encoder/VAE**
 ```
-python train_ae.py -model vae -num_layers 2 -hidden_size 128 -window_size 10 -dataset hd -epoch 300
-python predict_ae.py -model vae -num_layers 2 -hidden_size 128 -window_size 10 -dataset hd -epoch 300 -error_threshold 1.5
+python train_ae.py -model vae -num_layers 2 -hidden_size 128 -window_size 10 -dataset hd -epoch 300 -dropout 0.1
+python predict_ae.py -model vae -num_layers 2 -hidden_size 128 -window_size 10 -dataset hd -epoch 300 -dropout 0.1 -error_threshold 1.5
 ```
+
+**For k-means clustering on trained latent space**
+```
+python clustering_fit.py -model vae -num_layers 2 -hidden_size 128 -window_size 10 -dataset hd -epoch 300 -dropout 0.1 -k 5 -iter 30
+python clustering_pred.py -model vae -num_layers 2 -hidden_size 128 -window_size 10 -dataset hd -epoch 300 -dropout 0.1 -k 5 -threshold 3
+```
+
+
+BG/L dataset can be downloaded at [here](https://zenodo.org/record/3227177)
+
+Then use [Drain](https://github.com/logpai/logparser/blob/master/demo/Drain_demo.py) to parse it but replace the original one with LogPred/bgl/Drain_demo.py
+
+## Requirements
+
+* Pytorch version 1.3
+
+* Python 3
+
+Note that the parser Drain requires python 2.7
 
 
 ## References
