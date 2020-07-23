@@ -1,3 +1,10 @@
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import os
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 class DL(nn.Module):
     def __init__(self, input_size, hidden_size, num_layers, num_keys):
         super(DL, self).__init__()

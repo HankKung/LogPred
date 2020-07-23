@@ -19,8 +19,8 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 def generate_bgl(window_size):
     num_sessions = 0
-    inputs = []
-    outputs = []
+    inputs = set()
+    outputs = set()
     num_keys = set()
     with open('bgl/window_'+str(window_size)+'future_0/normal_train.txt', 'r') as f_len:
         file_len = len(f_len.readlines())
@@ -28,13 +28,15 @@ def generate_bgl(window_size):
         for line in f.readlines():
             num_sessions += 1
             line = tuple(map(lambda n: n, map(int, line.strip().split())))
-            inputs.append(line)
-            outputs.append(line)
+            inputs.add(line)
+            outputs.add(line)
             for key in line:
                 num_keys.add(key)
     print('Number of sessions: {}'.format(num_sessions))
     print('number of keys:{}'.format(len(num_keys)))
-    dataset = TensorDataset(torch.tensor(inputs, dtype=torch.float), torch.tensor(outputs))
+    inputs = list(inputs)
+    outputs = list(outputs)
+    dataset = TensorDataset(torch.tensor(inputs, dtype=torch.float), torch.tensor(outputs, dtype=torch.float))
     return dataset
 
 def generate_hdfs(window_size):
@@ -46,10 +48,12 @@ def generate_hdfs(window_size):
             num_sessions += 1
             line = tuple(map(lambda n: n - 1, map(int, line.strip().split())))
             for i in range(len(line) - window_size):
-                inputs.append(line[i:i + window_size])
-                outputs.append(line[i:i + window_size])
+                inputs.add(line[i:i + window_size])
+                outputs.add(line[i:i + window_size])
     print('Number of sessions: {}'.format(num_sessions))
-    dataset = TensorDataset(torch.tensor(inputs, dtype=torch.float), torch.tensor(outputs))
+    inputs = list(inputs)
+    outputs = list(outputs)
+    dataset = TensorDataset(torch.tensor(inputs, dtype=torch.float), torch.tensor(outputs, dtype=torch.float))
     return dataset
 
 

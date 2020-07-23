@@ -11,6 +11,8 @@ device = torch.device("cuda")
 
 
 def generate_hd(name, window_size):
+    # use set for testing, it will take about one min
+    # otherwise using list to store will take about 3 hrs.
     hdfs = set()
     with open('data/' + name, 'r') as f:
         for ln in f.readlines():

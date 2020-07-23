@@ -105,7 +105,7 @@ if __name__ == '__main__':
     len_normal = len(test_normal_loader)
     len_abnormal = len(test_abnormal_loader)
 
-    if args.model == 'vae'
+    if args.model == 'vae':
         model = VRAE(sequence_length=window_size,
                 number_of_features = 1,
                 num_classes = num_classes,
