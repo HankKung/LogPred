@@ -4,7 +4,9 @@ import torch.nn.functional as F
 import time
 import argparse
 from tqdm import tqdm
-from ae.ae import AE
+from vae.vae import VRAE
+import os
+import random
 
 # Device configuration
 device = torch.device("cuda")
@@ -37,32 +39,40 @@ def generate_hdfs(name, window_size):
     print('Number of sessions({}): {}'.format(name, len(hdfs)))
     return hdfs
 
+def generate_random_hdfs(window_size, num_samples):
+    hdfs = []
+    for i in range(num_samples):
+        line = [random.randint(0, 28) for j in range(window_size)]
+        hdfs.append(line)
+    return hdfs
 
 if __name__ == '__main__':
 
-    # Hyperparameters
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-dataset', type=str, default='hd', choices=['hd', 'bgl'])
 
-    # model parameters
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-model', type=str, default='vae', choices=['vae', 'ae'])
     parser.add_argument('-num_layers', default=2, type=int)
     parser.add_argument('-hidden_size', default=128, type=int)
     parser.add_argument('-latent_length', default=20, type=int)
-    parser.add_argument('-window_size', default=20, type=int)
 
-    # training parameters
-    parser.add_argument('-epoch', default=100, type=int)
+    parser.add_argument('-window_size', default=20, type=int)
+    parser.add_argument('-dataset', type=str, default='hd', choices=['hd', 'bgl'])
+    parser.add_argument('-epoch', default=150, type=int)
     parser.add_argument('-lr', default=0.001, type=float)
+    parser.add_argument('-dropout', default=0.0, type=float)
 
     parser.add_argument('-error_threshold', default=0.1, type=float)
-    parser.add_argument('-caption', type=str, default='')
+    
     args = parser.parse_args()
     num_layers = args.num_layers
     hidden_size = args.hidden_size
-    latent_length = args.latent_length
     window_size = args.window_size
     num_epochs = args.epoch
+    latent_length = args.latent_length
+    dropout = args.dropout
     threshold = args.error_threshold
+
+
     input_size = 1
 
     log = 'model/' + \
@@ -71,61 +81,119 @@ if __name__ == '__main__':
     '_hidden_size=' + str(hidden_size) + \
     '_latent_length=' + str(latent_length) + \
     '_num_layer=' + str(num_layers) + \
-    '_epoch=' + str(num_epochs)
+    '_epoch=' + str(num_epochs) + \
+    '_dropout=' + str(dropout)
     log = log + '_lr=' + str(args.lr) if args.lr != 0.001 else log
-    log = log + '_ae' + args.caption + '.pt' 
+    log = log + '_' + args.model + args.caption + '.pt' 
     print('retrieve model from: ', log)
 
     criterion = nn.CrossEntropyLoss()
     if args.dataset == 'hd':
+        random_loader = generate_random_hdfs(window_size, 10000)
         train_loader = generate_hdfs('hdfs_train', window_size)
         test_normal_loader = generate_hdfs('hdfs_test_normal', window_size)
         test_abnormal_loader = generate_hdfs('hdfs_test_abnormal', window_size)
         num_classes = 28
         num_classes +=1
     elif args.dataset == 'bgl':
+        # train_loader = generate_bgl('normal_train.txt', window_size)
         test_normal_loader = generate_bgl('normal_test.txt', window_size)
         test_abnormal_loader = generate_bgl('abnormal_test.txt', window_size)
-        num_classes = 1834
-    
+        num_classes = 1848
+    # len_random = len(random_loader)
+    # len_train = len(train_loader)
     len_normal = len(test_normal_loader)
     len_abnormal = len(test_abnormal_loader)
 
-    model = AE(input_size, hidden_size, latent_length, num_layers, num_classes, window_size).to(device)
+    if args.model == 'vae'
+        model = VRAE(sequence_length=window_size,
+                number_of_features = 1,
+                num_classes = num_classes,
+                hidden_size = hidden_size,
+                latent_length = latent_length,
+                dropout_rate=dropout)
+    elif args.model == 'ae':
+        model = AE(input_size, hidden_size, latent_length, num_layers, num_classes, window_size, dropout_rate=dropout)
+    
+    model = model.to(device)
     model.load_state_dict(torch.load(log))
     model.eval()
+
+    # random_loss = 0
+    # tbar = tqdm(random_loader)
+    # with torch.no_grad():
+    #     normal_error = 0.0
+    #     for index, line in enumerate(tbar):
+    #         # print(line)
+    #         seq = torch.tensor(line, dtype=torch.float).view(-1, window_size, input_size).to(device)
+    #         label = torch.tensor(line).to(device)
+    #         output, _ = model(seq)
+    #         output = output.permute(0,2,1)
+    #         label = label.unsqueeze(0)
+    #         loss = criterion(output, label)
+
+    #         random_loss +=loss.item()
+    #     print('random_loss: ', random_loss/len_random)
+
+    # train_FP = 0
+    # train_loss = 0
+    # tbar = tqdm(train_loader)
+    # with torch.no_grad():
+    #     for index, line in enumerate(tbar):
+    #         # print(line)
+    #         line = list(line)
+    #         random.shuffle(line)
+
+    #         line = tuple(line)
+    #         seq = torch.tensor(line, dtype=torch.float).view(-1, window_size, input_size).to(device)
+    #         label = torch.tensor(line).to(device)
+    #         output, _ = model(seq)
+    #         output = output.permute(0,2,1)
+    #         label = label.unsqueeze(0)
+    #         loss = criterion(output, label)
+
+    #         if loss.item() > threshold:
+    #             train_FP += 1
+    #         train_loss +=loss.item()
+    #     print('train_accuracy: ', train_FP/len_train)
+    #     print('train_loss: ', train_loss/len_train)
+
+    # train_FP = 0
+    # train_loss = 0
+    # tbar = tqdm(train_loader)
+    # with torch.no_grad():
+    #     for index, line in enumerate(tbar):
+    #         # print(line)
+    #         seq = torch.tensor(line, dtype=torch.float).view(-1, window_size, input_size).to(device)
+    #         label = torch.tensor(line).to(device)
+    #         output, _ = model(seq)
+    #         output = output.permute(0,2,1)
+    #         label = label.unsqueeze(0)
+    #         loss = criterion(output, label)
+
+    #         if loss.item() > threshold:
+    #             train_FP += 1
+    #         train_loss += loss.item()
+    #     print('train_accuracy:', train_FP/len_train)
+    #     print('train_loss: ', train_loss/len_train)
+
 
     TP = 0
     FP = 0
     # Test the model
-    with torch.no_grad():
-        normal_error = 0.0
-        for index, line in enumerate(train_loader):
-
-            seq = torch.tensor(line, dtype=torch.float).view(-1, window_size, input_size).to(device)
-            label = torch.tensor(line).to(device)
-            output = model(seq)
-            output = output.permute(0,2,1)
-            label = label.unsqueeze(0)
-
-            loss = criterion(output, label)
-            if loss.item() > threshold:
-                FP += 1
-            normal_error +=loss.item()
-
     tbar = tqdm(test_normal_loader)
     with torch.no_grad():
         normal_error = 0.0
         for index, line in enumerate(tbar):
-
             seq = torch.tensor(line, dtype=torch.float).view(-1, window_size, input_size).to(device)
             label = torch.tensor(line).to(device)
-            output = model(seq)
+            if args.model == 'vae':
+                output, _ = model(seq)
+            else:
+                output = model(seq)
             output = output.permute(0,2,1)
             label = label.unsqueeze(0)
-
             loss = criterion(output, label)
-
             if loss.item() > threshold:
                 FP += 1
             normal_error +=loss.item()
@@ -138,7 +206,10 @@ if __name__ == '__main__':
 
             seq = torch.tensor(line, dtype=torch.float).view(-1, window_size, input_size).to(device)
             label = torch.tensor(line).to(device)
-            output = model(seq)
+            if args.model == 'vae':
+                output, _ = model(seq)
+            else:
+                output = model(seq)
             output = output.permute(0,2,1)
             label = label.unsqueeze(0)
             loss = criterion(output, label)
