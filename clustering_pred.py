@@ -12,6 +12,7 @@ import numpy as np
 from ae.ae import AE, KMEANS
 from vae.vae import VRAE
 import random
+from deeplog.model import *
 
 
 # Device configuration
@@ -62,7 +63,7 @@ if __name__ == '__main__':
     
     parser = argparse.ArgumentParser()
     # ae
-    parser.add_argument('-model', type=str, default='ae', choices=['ae', 'vae'])
+    parser.add_argument('-model', type=str, default='ae', choices=['ae', 'vae', 'dl'])
     parser.add_argument('-num_layers', default=2, type=int)
     parser.add_argument('-hidden_size', default=128, type=int)
     parser.add_argument('-latent_length', default=20, type=int)
@@ -93,7 +94,8 @@ if __name__ == '__main__':
         test_normal_loader = generate_hdfs('hdfs_test_normal', window_size)
         test_abnormal_loader = generate_hdfs('hdfs_test_abnormal', window_size)
         num_classes = 28
-        num_classes += 1
+        if args.model != 'dl':
+            num_classes +=1
     elif args.dataset == 'bgl':
         test_normal_loader = generate_bgl('normal_test.txt', window_size)
         test_abnormal_loader = generate_bgl('abnormal_test.txt', window_size)
@@ -104,16 +106,25 @@ if __name__ == '__main__':
     len_abnormal = len(test_abnormal_loader)
 
     model_path = 'model/'
-    log = model_path + \
-    'dataset=' + args.dataset + \
-    '_window_size=' + str(window_size) + \
-    '_hidden_size=' + str(hidden_size) + \
-    '_latent_length=' + str(latent_length) + \
-    '_num_layer=' + str(num_layers) + \
-    '_epoch=' + str(num_epochs) + \
-    '_dropout=' + str(dropout)
-    log = log + '_lr=' + str(args.lr) if args.lr != 0.001 else log
-    log = log + '_' + args.model + '.pt' 
+    if args.model == 'ae' or args.model == 'vae':
+        log = model_path + \
+        'dataset=' + args.dataset + \
+        '_window_size=' + str(window_size) + \
+        '_hidden_size=' + str(hidden_size) + \
+        '_latent_length=' + str(latent_length) + \
+        '_num_layer=' + str(num_layers) + \
+        '_epoch=' + str(num_epochs) + \
+        '_dropout=' + str(dropout) 
+        log = log + '_lr=' + str(args.lr) if args.lr != 0.001 else log
+        log = log + '_' + args.model + '.pt' 
+    else:
+        log = 'model/num_layer=' + str(num_layers) + \
+        '_window_size=' + str(window_size) + \
+        '_hidden=' + str(hidden_size) + \
+        '_dataset=' + args.dataset +\
+        '_epoch='+str(args.epoch)
+        log = log + '_' + args.model
+        log = log + '.pt'
     print('retrieve model from: ', log)
 
 
@@ -126,6 +137,8 @@ if __name__ == '__main__':
             hidden_size=hidden_size,
             latent_length=latent_length,
             training=False)
+    elif args.model == 'dl':
+        model = DL(input_size, hidden_size, num_layers, num_classes)
 
     model = model.to(device)
     model.load_state_dict(torch.load(log))

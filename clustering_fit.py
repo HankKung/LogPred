@@ -13,6 +13,9 @@ from ae.ae import AE, KMEANS
 from vae.vae import VRAE
 from sklearn.manifold import TSNE
 from pathlib import Path
+from deeplog.model import *
+
+
 # Device configuration
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -66,7 +69,7 @@ if __name__ == '__main__':
     
     parser = argparse.ArgumentParser()
     # ae
-    parser.add_argument('-model', type=str, default='ae', choices=['ae', 'vae'])
+    parser.add_argument('-model', type=str, default='ae', choices=['ae', 'vae', 'dl'])
     parser.add_argument('-num_layers', default=2, type=int)
     parser.add_argument('-hidden_size', default=128, type=int)
     parser.add_argument('-latent_length', default=20, type=int)
@@ -96,7 +99,8 @@ if __name__ == '__main__':
         seq_dataset = generate_hdfs(window_size)
         num_classes = 28
         # for -1 padding during testing
-        num_classes +=1
+        if args.model != 'dl':
+            num_classes +=1
     elif args.dataset == 'bgl':
         seq_dataset = generate_bgl(window_size)
         num_classes = 1848
@@ -104,27 +108,38 @@ if __name__ == '__main__':
     dataloader = DataLoader(seq_dataset, batch_size=batch_size, shuffle=True, pin_memory=True)
 
     model_path = 'model/'
-    log = model_path + \
-    'dataset=' + args.dataset + \
-    '_window_size=' + str(window_size) + \
-    '_hidden_size=' + str(hidden_size) + \
-    '_latent_length=' + str(latent_length) + \
-    '_num_layer=' + str(num_layers) + \
-    '_epoch=' + str(num_epochs) + \
-    '_dropout=' + str(dropout) 
-    log = log + '_lr=' + str(args.lr) if args.lr != 0.001 else log
-    log = log + '_' + args.model + '.pt' 
+    if args.model == 'ae' or args.model == 'vae':
+        log = model_path + \
+        'dataset=' + args.dataset + \
+        '_window_size=' + str(window_size) + \
+        '_hidden_size=' + str(hidden_size) + \
+        '_latent_length=' + str(latent_length) + \
+        '_num_layer=' + str(num_layers) + \
+        '_epoch=' + str(num_epochs) + \
+        '_dropout=' + str(dropout) 
+        log = log + '_lr=' + str(args.lr) if args.lr != 0.001 else log
+        log = log + '_' + args.model + '.pt' 
+    else:
+        log = 'model/num_layer=' + str(num_layers) + \
+        '_window_size=' + str(window_size) + \
+        '_hidden=' + str(hidden_size) + \
+        '_dataset=' + args.dataset +\
+        '_epoch='+str(args.epoch)
+        log = log + '_' + args.model
+        log = log + '.pt'
     print('retrieve model from: ', log)
 
     if args.model == 'ae':
         model = AE(input_size, hidden_size, latent_length, num_layers, num_classes, window_size)
-    else:
+    elif args.model == 'vae':
         model = VRAE(sequence_length=window_size,
             number_of_features=1,
             num_classes=num_classes,
             hidden_size=hidden_size,
             latent_length=latent_length,
             training=False)
+    elif args.model == 'dl':
+        model = DL(input_size, hidden_size, num_layers, num_classes)
 
     model = model.to(device)
     model.load_state_dict(torch.load(log))

@@ -22,9 +22,13 @@ class DL(nn.Module):
         h0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(device)
         c0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(device)
         out, _ = self.lstm(x, (h0, c0))
-        # print(out.shape)
         out = self.fc(out[:, -1, :])
         return out
+    def get_latent(self, x):
+        h0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(device)
+        c0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(device)
+        out, _ = self.lstm(x, (h0, c0))
+        return torch.sum(out, 1)
 
 class Att(nn.Module):
     def __init__(self, input_size, hidden_size, num_layers, num_keys):

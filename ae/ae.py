@@ -77,7 +77,7 @@ class KMEANS:
             self.update_center(x)
             if self.verbose:
                 print(self.variation, torch.argmin(self.dists, (0)))
-            if torch.abs(self.variation) < 1e-1 and self.max_iter is None:
+            if torch.abs(self.variation) < 1e-4 and self.max_iter is None:
                 break
             elif self.max_iter is not None and self.count == self.max_iter:
                 break
