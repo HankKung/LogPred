@@ -1,4 +1,6 @@
 import time
+import json
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -9,6 +11,8 @@ import argparse
 from tqdm import tqdm
 import os
 from vae.vae import VRAE
+from ae.ae import *
+
 # Device configuration
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -34,20 +38,35 @@ def generate_bgl(name, window_size):
     dataset = TensorDataset(torch.tensor(inputs, dtype=torch.float), torch.tensor(outputs))
     return dataset
 
-def generate_hdfs(window_size):
+def generate_hdfs(window_size, semantic=False):
     num_sessions = 0
     inputs = []
     outputs = []
+    if semantic:
+        with open('hdfs/event2semantic_vec.json', 'r') as load_f:
+            sem = json.load(load_f)
+
     with open('data/hdfs_train', 'r') as f:
         for line in f.readlines():
             num_sessions += 1
             line = tuple(map(lambda n: n - 1, map(int, line.strip().split())))
             for i in range(len(line) - window_size):
-                inputs.append(line[i:i + window_size])
-                outputs.append(line[i:i + window_size])
+                seq = line[i:i + window_size]
+                outputs.append(seq)
+                if semantic:
+                    seq = seq2vec(seq, sem)
+                inputs.append(seq)
+                # outputs.append(seq)
     print('Number of sessions: {}'.format(num_sessions))
     dataset = TensorDataset(torch.tensor(inputs, dtype=torch.float), torch.tensor(outputs))
     return dataset
+
+def seq2vec(seq, json_file):
+    seq = list(seq)
+    for i, e in enumerate(seq):
+        seq[i] = json_file[str(e)]
+    return tuple(seq)
+
 
 
 
@@ -68,6 +87,7 @@ if __name__ == '__main__':
     parser.add_argument('-epoch', default=150, type=int)
     parser.add_argument('-lr', default=0.001, type=float)
     parser.add_argument('-dropout', default=0.0, type=float)
+    parser.add_argument('-semantic', default=False, type=bool)
     args = parser.parse_args()
     num_layers = args.num_layers
     hidden_size = args.hidden_size
@@ -76,11 +96,15 @@ if __name__ == '__main__':
     latent_length = args.latent_length
     dropout = args.dropout
 
+    if args.semantic:
+        input_size = 300
+
     if args.dataset == 'hd':
-        seq_dataset = generate_hdfs(window_size)
+        seq_dataset = generate_hdfs(window_size, semantic=args.semantic)
         num_classes = 28
         # for -1 padding during testing
         num_classes +=1
+        
     elif args.dataset == 'bgl':
         seq_dataset = generate_bgl('normal_train.txt', window_size)
         # val_dataset = generate_bgl('abnormal_test.txt', window_size)
@@ -105,7 +129,7 @@ if __name__ == '__main__':
 
     if args.model == 'vae':
         model = VRAE(sequence_length=window_size,
-                number_of_features=1,
+                number_of_features=input_size,
                 num_classes=num_classes,
                 hidden_size=hidden_size,
                 latent_length=latent_length,
@@ -130,7 +154,7 @@ if __name__ == '__main__':
         model.train()
         for step, (seq, label) in enumerate(tbar):
             seq = seq.clone().detach().view(-1, window_size, input_size).to(device)
-            
+            print(seq.shape)
             if args.model =='vae':            
                 loss, rec, kl = model.compute_loss(seq)
             else:

@@ -5,6 +5,7 @@ import time
 import argparse
 from tqdm import tqdm
 from deeplog.model import *
+from ae.ae import *
 
 # Device configuration
 device = torch.device("cuda")
