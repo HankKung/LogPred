@@ -1,16 +1,29 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.utils.data import TensorDataset, DataLoader
+
 import time
 import argparse
 from tqdm import tqdm
 from vae.vae import VRAE
 import os
 import random
+import json
+
+from ae.ae import *
 
 # Device configuration
 device = torch.device("cuda")
 
+def seq2vec(seq, json_file):
+    seq = list(seq)
+    for i, e in enumerate(seq):
+        if str(e) != 28:
+            seq[i] = json_file[str(e)]
+        else:
+            seq[i] = torch.zeros(300)
+    return tuple(seq)
 
 def generate_bgl(name, window_size):
     num_sessions = 0
@@ -26,18 +39,18 @@ def generate_bgl(name, window_size):
     print('Number of sessions({}): {}'.format(name, num_sessions))
     return inputs
 
-def generate_hdfs(name, window_size):
+def generate_hd(name, window_size):
+# use set for testing, it will take about one min
+# otherwise using list to store will take about 3 hrs.
     hdfs = set()
     with open('data/' + name, 'r') as f:
-        for line in f.readlines():
-            line = list(map(lambda n: n - 1, map(int, line.strip().split())))
-            ### pad 28 if the sequence len is less than the window_size (log key start from 0 to 27)
-            line = line + [28] * (window_size + 1 - len(line))
-            for i in range(len(line) - window_size):
-                seq = line[i:i + window_size]
-                hdfs.add(tuple(seq))
+        for ln in f.readlines():
+            ln = list(map(lambda n: n - 1, map(int, ln.strip().split())))
+            ln = ln + [28] * (window_size + 1 - len(ln))
+            hdfs.add(tuple(ln))
     print('Number of sessions({}): {}'.format(name, len(hdfs)))
     return hdfs
+
 
 def generate_random_hdfs(window_size, num_samples):
     hdfs = []
@@ -72,7 +85,6 @@ if __name__ == '__main__':
     dropout = args.dropout
     threshold = args.error_threshold
 
-
     input_size = 1
 
     log = 'model/' + \
@@ -83,146 +95,213 @@ if __name__ == '__main__':
     '_num_layer=' + str(num_layers) + \
     '_epoch=' + str(num_epochs) + \
     '_dropout=' + str(dropout)
+
     log = log + '_lr=' + str(args.lr) if args.lr != 0.001 else log
     log = log + '_' + args.model + '.pt' 
     print('retrieve model from: ', log)
 
     criterion = nn.CrossEntropyLoss()
     if args.dataset == 'hd':
-        random_loader = generate_random_hdfs(window_size, 10000)
-        train_loader = generate_hdfs('hdfs_train', window_size)
-        test_normal_loader = generate_hdfs('hdfs_test_normal', window_size)
-        test_abnormal_loader = generate_hdfs('hdfs_test_abnormal', window_size)
+        test_normal_loader = generate_hd('hdfs_test_normal', window_size)
+        test_abnormal_loader = generate_hd('hdfs_test_abnormal', window_size)
+
         num_classes = 28
         num_classes +=1
     elif args.dataset == 'bgl':
-        # train_loader = generate_bgl('normal_train.txt', window_size)
         test_normal_loader = generate_bgl('normal_test.txt', window_size)
         test_abnormal_loader = generate_bgl('abnormal_test.txt', window_size)
         num_classes = 1848
-    # len_random = len(random_loader)
-    # len_train = len(train_loader)
+
     len_normal = len(test_normal_loader)
     len_abnormal = len(test_abnormal_loader)
 
     if args.model == 'vae':
         model = VRAE(sequence_length=window_size,
-                number_of_features = 1,
+                number_of_features = input_size,
                 num_classes = num_classes,
                 hidden_size = hidden_size,
                 latent_length = latent_length,
                 dropout_rate=dropout)
     elif args.model == 'ae':
-        model = AE(input_size, hidden_size, latent_length, num_layers, num_classes, window_size, dropout_rate=dropout)
+        model = AE(input_size,
+                    hidden_size,
+                    latent_length,
+                    num_layers,
+                    num_classes,
+                    window_size,
+                    dropout_rate=dropout)
     
     model = model.to(device)
     model.load_state_dict(torch.load(log))
     model.eval()
 
-    # random_loss = 0
-    # tbar = tqdm(random_loader)
-    # with torch.no_grad():
-    #     normal_error = 0.0
-    #     for index, line in enumerate(tbar):
-    #         # print(line)
-    #         seq = torch.tensor(line, dtype=torch.float).view(-1, window_size, input_size).to(device)
-    #         label = torch.tensor(line).to(device)
-    #         output, _ = model(seq)
-    #         output = output.permute(0,2,1)
-    #         label = label.unsqueeze(0)
-    #         loss = criterion(output, label)
+    if args.dataset == 'hd':
+        TP = 0
+        FP = 0
 
-    #         random_loss +=loss.item()
-    #     print('random_loss: ', random_loss/len_random)
+        # Test the model
+        tbar = tqdm(test_normal_loader)
+        with torch.no_grad():
+            normal_error = 0.0
+            FP_error = 0.0
+            n = 0
+            for index, seq in enumerate(tbar):
+                seq = torch.tensor(seq, dtype=torch.float).to(device)
+                label_full = torch.tensor(seq, dtype=torch.long).to(device)
+                for i in range(seq.shape[0] - window_size):
+                    inputs = seq[i:i + window_size]
+                    label = label_full[i:i + window_size]
 
-    # train_FP = 0
-    # train_loss = 0
-    # tbar = tqdm(train_loader)
-    # with torch.no_grad():
-    #     for index, line in enumerate(tbar):
-    #         # print(line)
-    #         line = list(line)
-    #         random.shuffle(line)
+                    inputs = inputs.view(-1, window_size, input_size)
+                    # label = torch.tensor(label).to(device).unsqueeze(0)
+                    label = label.unsqueeze(0)
+                    if args.model == 'vae':
+                        output, _ = model(inputs)
+                    else:
+                        output = model(inputs)
 
-    #         line = tuple(line)
-    #         seq = torch.tensor(line, dtype=torch.float).view(-1, window_size, input_size).to(device)
-    #         label = torch.tensor(line).to(device)
-    #         output, _ = model(seq)
-    #         output = output.permute(0,2,1)
-    #         label = label.unsqueeze(0)
-    #         loss = criterion(output, label)
+                    output = output.permute(1,2,0)
+                    # label = label.unsqueeze(0)
+               
+                    loss = criterion(output, label)
+                    if loss.item() > threshold:
+                        FP += 1
+                        FP_error += loss.item()
+                        break
+                    else:
+                        n += 1
+                        normal_error +=loss.item()
+                if n !=0 and FP !=0:
+                    tbar.set_description('normal error: %.3f FP error: %.3f' % ((normal_error / n), (FP_error / (FP))))
 
-    #         if loss.item() > threshold:
-    #             train_FP += 1
-    #         train_loss +=loss.item()
-    #     print('train_accuracy: ', train_FP/len_train)
-    #     print('train_loss: ', train_loss/len_train)
+        tbar = tqdm(test_abnormal_loader)
+        with torch.no_grad():
+            normal_error = 0.0
+            TP_error = 0.0
+            n = 0
+            for index, seq in enumerate(tbar):
+                seq = torch.tensor(seq, dtype=torch.float).to(device)
+                label_full = torch.tensor(seq, dtype=torch.long).to(device)
+                for i in range(len(seq) - window_size):
+                    inputs = seq[i:i + window_size]
+                    label = label_full[i:i + window_size]
 
-    # train_FP = 0
-    # train_loss = 0
-    # tbar = tqdm(train_loader)
-    # with torch.no_grad():
-    #     for index, line in enumerate(tbar):
-    #         # print(line)
-    #         seq = torch.tensor(line, dtype=torch.float).view(-1, window_size, input_size).to(device)
-    #         label = torch.tensor(line).to(device)
-    #         output, _ = model(seq)
-    #         output = output.permute(0,2,1)
-    #         label = label.unsqueeze(0)
-    #         loss = criterion(output, label)
+                    inputs = inputs.view(-1, window_size, input_size)
+                    label = label.unsqueeze(0)
 
-    #         if loss.item() > threshold:
-    #             train_FP += 1
-    #         train_loss += loss.item()
-    #     print('train_accuracy:', train_FP/len_train)
-    #     print('train_loss: ', train_loss/len_train)
+                    if args.model == 'vae':
+                        output, _ = model(inputs)
+                    else:
+                        output = model(inputs)
+                        
+                    output = output.permute(1,2,0)
+                    loss = criterion(output, label)
 
+                    if loss.item() > threshold:
+                        TP += 1
+                        TP_error += loss.item()
+                        break
+                    else:
+                        normal_error += loss.item()
+                        n += 1
+                    if n !=0 and TP !=0:
+                        tbar.set_description('normal error: %.3f TP error: %.3f' % ((normal_error / (n+ 1)), (TP_error / (TP + 1))))
+    else:
+        TP = 0
+        FP = 0
+        n_0_05 = 0
+        n_05_1 = 0
+        n_1_15 = 0
+        n_15_20 = 0
+        n_20_25 = 0
+        n_3 = 0
+        # Test the model
+        tbar = tqdm(test_normal_loader)
+        with torch.no_grad():
+            normal_error = 0.0
+            for index, (seq, label) in enumerate(tbar):
+                # print(seq.shape)
+                seq = torch.tensor(seq, dtype=torch.float).view(-1, window_size, input_size).to(device)
+                label = torch.tensor(label).to(device)
 
-    TP = 0
-    FP = 0
-    # Test the model
-    tbar = tqdm(test_normal_loader)
-    with torch.no_grad():
-        normal_error = 0.0
-        for index, line in enumerate(tbar):
-            seq = torch.tensor(line, dtype=torch.float).view(-1, window_size, input_size).to(device)
-            label = torch.tensor(line).to(device)
-            if args.model == 'vae':
-                output, _ = model(seq)
-            else:
-                output = model(seq)
-            output = output.permute(0,2,1)
-            label = label.unsqueeze(0)
-            loss = criterion(output, label)
-            if loss.item() > threshold:
-                FP += 1
-            normal_error +=loss.item()
-            tbar.set_description('normal error: %.3f' % (normal_error / (index + 1)))
+                if args.model == 'vae':
+                    output, _ = model(seq)
+                else:
+                    output = model(seq)
 
-    tbar = tqdm(test_abnormal_loader)
-    with torch.no_grad():
-        abnormal_error = 0.0
-        for index, line in enumerate(tbar):
+                output = output.permute(1,2,0)
+                # label = label.unsqueeze(0)
+                loss = criterion(output, label)
+                if loss.item() > threshold:
+                    FP += 1
+                if loss.item()<0.5:
+                    n_0_05 +=1
+                elif loss.item()<1.0:
+                    n_05_1 +=1
+                elif loss.item()<1.5:
+                    n_1_15 +=1
+                elif loss.item()<2.0:
+                    n_15_20 +=1
+                elif loss.item()<2.5:
+                    n_20_25 +=1
+                else:
+                    n_3+=1
+                normal_error +=loss.item()
+                tbar.set_description('normal error: %.3f' % (normal_error / (index + 1)))
+            print(n_0_05)
+            print(n_05_1)
+            print(n_1_15)
+            print(n_15_20)
+            print(n_20_25)
+            print(n_3)
+        n_0_05 = 0
+        n_05_1 = 0
+        n_1_15 = 0
+        n_15_20 = 0
+        n_20_25 = 0
+        n_3 = 0
+        tbar = tqdm(test_abnormal_loader)
+        with torch.no_grad():
+            abnormal_error = 0.0
+            for index, (seq, label) in enumerate(tbar):
+                seq = torch.tensor(seq, dtype=torch.float).view(-1, window_size, input_size).to(device)
+                label = torch.tensor(label).to(device)
 
-            seq = torch.tensor(line, dtype=torch.float).view(-1, window_size, input_size).to(device)
-            label = torch.tensor(line).to(device)
-            if args.model == 'vae':
-                output, _ = model(seq)
-            else:
-                output = model(seq)
-            output = output.permute(0,2,1)
-            label = label.unsqueeze(0)
-            loss = criterion(output, label)
+                if args.model == 'vae':
+                    output, _ = model(seq)
+                else:
+                    output = model(seq)
+                    
+                output = output.permute(1,2,0)
+                loss = criterion(output, label)
 
-            if loss.item() > threshold:
-                TP += 1
-            abnormal_error += loss.item()
-            tbar.set_description('abnormal error: %.3f' % (abnormal_error / (index + 1)))
+                if loss.item() > threshold:
+                    TP += 1
+                if loss.item()<0.5:
 
-    print('normal_avg_error:')
-    print(normal_error/len_normal)
-    print('abnormal_avg_error:')
-    print(abnormal_error/len_abnormal)
+                    n_0_05 +=1
+                elif loss.item()<1.0:
+                    n_05_1 +=1
+                elif loss.item()<1.5:
+                    n_1_15 +=1
+                elif loss.item()<2.0:
+                    n_15_20 +=1
+                elif loss.item()<2.5:
+                    n_20_25 +=1
+                else:
+                    n_3+=1
+                abnormal_error += loss.item()
+                tbar.set_description('abnormal error: %.3f' % (abnormal_error / (index + 1)))
+            print(n_0_05)
+            print(n_05_1)
+            print(n_1_15)
+            print(n_15_20)
+            print(n_20_25)
+            print(n_3)
+    # print('normal_avg_error:')
+    # print(normal_error/len_normal)
+    # print('abnormal_avg_error:')
+    # print(abnormal_error/len_abnormal)
 
     # Compute precision, recall and F1-measure
     FN = len(test_abnormal_loader) - TP
@@ -231,3 +310,4 @@ if __name__ == '__main__':
     F1 = 2 * P * R / (P + R)
     print('false positive (FP): {}, false negative (FN): {}, Precision: {:.3f}%, Recall: {:.3f}%, F1-measure: {:.3f}%'.format(FP, FN, P, R, F1))
     print('Finished Predicting')
+    

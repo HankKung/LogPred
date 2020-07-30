@@ -1,5 +1,4 @@
 import time
-import json
 
 import torch
 import torch.nn as nn
@@ -16,6 +15,14 @@ from ae.ae import *
 # Device configuration
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+def seq2vec(seq, json_file):
+    seq = list(seq)
+    for i, e in enumerate(seq):
+        if str(e) != 28:
+            seq[i] = json_file[str(e)]
+        else:
+            seq[i] = torch.zeros(300)
+    return tuple(seq)
 
 def generate_bgl(name, window_size):
     num_sessions = 0
@@ -38,37 +45,23 @@ def generate_bgl(name, window_size):
     dataset = TensorDataset(torch.tensor(inputs, dtype=torch.float), torch.tensor(outputs))
     return dataset
 
-def generate_hdfs(window_size, semantic=False):
+def generate_hdfs(window_size, split=''):
     num_sessions = 0
     inputs = []
     outputs = []
-    if semantic:
-        with open('hdfs/event2semantic_vec.json', 'r') as load_f:
-            sem = json.load(load_f)
-
-    with open('data/hdfs_train', 'r') as f:
+    
+    with open('data/hdfs_train' + split, 'r') as f:
         for line in f.readlines():
             num_sessions += 1
             line = tuple(map(lambda n: n - 1, map(int, line.strip().split())))
             for i in range(len(line) - window_size):
                 seq = line[i:i + window_size]
-                outputs.append(seq)
-                if semantic:
-                    seq = seq2vec(seq, sem)
                 inputs.append(seq)
-                # outputs.append(seq)
+                outputs.append(seq)
     print('Number of sessions: {}'.format(num_sessions))
+
     dataset = TensorDataset(torch.tensor(inputs, dtype=torch.float), torch.tensor(outputs))
     return dataset
-
-def seq2vec(seq, json_file):
-    seq = list(seq)
-    for i, e in enumerate(seq):
-        seq[i] = json_file[str(e)]
-    return tuple(seq)
-
-
-
 
 if __name__ == '__main__':
 
@@ -83,11 +76,10 @@ if __name__ == '__main__':
     parser.add_argument('-hidden_size', default=128, type=int)
     parser.add_argument('-latent_length', default=20, type=int)
     parser.add_argument('-window_size', default=20, type=int)
-    parser.add_argument('-dataset', type=str, default='hd', choices=['hd', 'bgl'])
+    parser.add_argument('-dataset', type=str, default='hd', choices=['hd', 'hd80', 'bgl'])
     parser.add_argument('-epoch', default=150, type=int)
     parser.add_argument('-lr', default=0.001, type=float)
     parser.add_argument('-dropout', default=0.0, type=float)
-    parser.add_argument('-semantic', default=False, type=bool)
     args = parser.parse_args()
     num_layers = args.num_layers
     hidden_size = args.hidden_size
@@ -96,15 +88,16 @@ if __name__ == '__main__':
     latent_length = args.latent_length
     dropout = args.dropout
 
-    if args.semantic:
-        input_size = 300
-
     if args.dataset == 'hd':
-        seq_dataset = generate_hdfs(window_size, semantic=args.semantic)
+        seq_dataset = generate_hdfs(window_size, split='')
         num_classes = 28
         # for -1 padding during testing
         num_classes +=1
-        
+    elif args.dataset == 'hd80':
+        seq_dataset = generate_hdfs(window_size, split='_80')
+        num_classes = 28
+        # for -1 padding during testing
+        num_classes +=1
     elif args.dataset == 'bgl':
         seq_dataset = generate_bgl('normal_train.txt', window_size)
         # val_dataset = generate_bgl('abnormal_test.txt', window_size)
@@ -119,7 +112,7 @@ if __name__ == '__main__':
     '_latent_length=' + str(latent_length) + \
     '_num_layer=' + str(num_layers) + \
     '_epoch=' + str(num_epochs) + \
-    '_dropout=' + str(dropout)
+    '_dropout=' + str(dropout) 
     log = log + '_lr=' + str(args.lr) if args.lr != 0.001 else log
     log = log + '_' + args.model
     print('store model at:')
@@ -136,7 +129,13 @@ if __name__ == '__main__':
                 training=True,
                 dropout_rate=dropout)
     elif args.model == 'ae':
-        model = AE(input_size, hidden_size, latent_length, num_layers, num_classes, window_size, dropout_rate=dropout)
+        model = AE(input_size,
+                    hidden_size,
+                    latent_length,
+                    num_layers,
+                    num_classes,
+                    window_size,
+                    dropout_rate=dropout)
     model = model.to(device)
 
     # Loss and optimizer
@@ -154,12 +153,15 @@ if __name__ == '__main__':
         model.train()
         for step, (seq, label) in enumerate(tbar):
             seq = seq.clone().detach().view(-1, window_size, input_size).to(device)
-            print(seq.shape)
+            # print(seq.shape)
+            label = torch.tensor(label).to(device)
             if args.model =='vae':            
                 loss, rec, kl = model.compute_loss(seq)
             else:
                 output = model(seq)
-                output = output.permute(0,2,1)
+                output = output.permute(1,2,0)
+                # print(output.shape)
+                # print(label.shape)
                 loss = criterion(output, label)
 
             optimizer.zero_grad()
