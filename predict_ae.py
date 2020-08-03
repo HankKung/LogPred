@@ -16,14 +16,6 @@ from ae.ae import *
 # Device configuration
 device = torch.device("cuda")
 
-def seq2vec(seq, json_file):
-    seq = list(seq)
-    for i, e in enumerate(seq):
-        if str(e) != 28:
-            seq[i] = json_file[str(e)]
-        else:
-            seq[i] = torch.zeros(300)
-    return tuple(seq)
 
 def generate_bgl(name, window_size):
     num_sessions = 0
@@ -43,11 +35,13 @@ def generate_hd(name, window_size):
 # use set for testing, it will take about one min
 # otherwise using list to store will take about 3 hrs.
     hdfs = set()
+    # hdfs = []
     with open('data/' + name, 'r') as f:
         for ln in f.readlines():
             ln = list(map(lambda n: n - 1, map(int, ln.strip().split())))
             ln = ln + [28] * (window_size + 1 - len(ln))
             hdfs.add(tuple(ln))
+            # hdfs.append(tuple(ln))
     print('Number of sessions({}): {}'.format(name, len(hdfs)))
     return hdfs
 
@@ -219,11 +213,11 @@ if __name__ == '__main__':
         tbar = tqdm(test_normal_loader)
         with torch.no_grad():
             normal_error = 0.0
-            for index, (seq, label) in enumerate(tbar):
+            for index, line in enumerate(tbar):
                 # print(seq.shape)
-                seq = torch.tensor(seq, dtype=torch.float).view(-1, window_size, input_size).to(device)
-                label = torch.tensor(label).to(device)
-
+                seq = torch.tensor(line, dtype=torch.float).view(-1, window_size, input_size).to(device)
+                label = torch.tensor(line).to(device)
+                label = label.unsqueeze(0)
                 if args.model == 'vae':
                     output, _ = model(seq)
                 else:
@@ -263,10 +257,10 @@ if __name__ == '__main__':
         tbar = tqdm(test_abnormal_loader)
         with torch.no_grad():
             abnormal_error = 0.0
-            for index, (seq, label) in enumerate(tbar):
-                seq = torch.tensor(seq, dtype=torch.float).view(-1, window_size, input_size).to(device)
-                label = torch.tensor(label).to(device)
-
+            for index, line in enumerate(tbar):
+                seq = torch.tensor(line, dtype=torch.float).view(-1, window_size, input_size).to(device)
+                label = torch.tensor(line).to(device)
+                label = label.unsqueeze(0)
                 if args.model == 'vae':
                     output, _ = model(seq)
                 else:
