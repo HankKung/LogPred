@@ -9,40 +9,41 @@ from torch.utils.data import TensorDataset, DataLoader
 import argparse
 from tqdm import tqdm
 import os
-from vae.vae import VRAE
-from ae.ae import *
+from net.vae import VRAE
+from net.ae import *
 
 # Device configuration
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-def seq2vec(seq, json_file):
-    seq = list(seq)
-    for i, e in enumerate(seq):
-        if str(e) != 28:
-            seq[i] = json_file[str(e)]
-        else:
-            seq[i] = torch.zeros(300)
-    return tuple(seq)
 
 def generate_bgl(name, window_size):
     num_sessions = 0
     inputs = []
     outputs = []
     num_keys = set()
-    with open('bgl/window_'+str(window_size)+'future_0/' + name, 'r') as f_len:
+    with open('bgl/window_'+str(window_size)+'future_0' + 'remove_8_random/' + name, 'r') as f_len:
         file_len = len(f_len.readlines())
-    with open('bgl/window_'+str(window_size)+'future_0/' + name, 'r') as f:
+    with open('bgl/window_'+str(window_size)+'future_0' + 'remove_8_random/' + name, 'r') as f:
         for line in f.readlines():
             num_sessions += 1
             line = tuple(map(lambda n: n, map(int, line.strip().split())))
             inputs.append(line)
-            outputs.append(line)
             for key in line:
                 num_keys.add(key)
+
+    # with open('bgl/window_'+str(window_size)+'future_0' + 'remove_8/' + 'normal_test.txt', 'r') as f:
+    #     for line in f.readlines():
+    #         num_sessions += 1
+    #         line = tuple(map(lambda n: n, map(int, line.strip().split())))
+    #         inputs.append(line)
+    #         outputs.append(line)
+    #         for key in line:
+    #             num_keys.add(key)
+    inputs = list(inputs)
+
     print(name)
     print('Number of sessions: {}'.format(num_sessions))
     print('number of keys:{}'.format(len(num_keys)))
-    dataset = TensorDataset(torch.tensor(inputs, dtype=torch.float), torch.tensor(outputs))
+    dataset = TensorDataset(torch.tensor(inputs, dtype=torch.float), torch.tensor(inputs))
     return dataset
 
 def generate_hdfs(window_size, split=''):
@@ -101,7 +102,7 @@ if __name__ == '__main__':
     elif args.dataset == 'bgl':
         seq_dataset = generate_bgl('normal_train.txt', window_size)
         # val_dataset = generate_bgl('abnormal_test.txt', window_size)
-        num_classes = 1848
+        num_classes = 377
     
     dataloader = DataLoader(seq_dataset, batch_size=batch_size, shuffle=True, pin_memory=True)
     
@@ -154,14 +155,14 @@ if __name__ == '__main__':
         for step, (seq, label) in enumerate(tbar):
             seq = seq.clone().detach().view(-1, window_size, input_size).to(device)
             # print(seq.shape)
+            # print(seq.data)
             label = torch.tensor(label).to(device)
             if args.model =='vae':            
                 loss, rec, kl = model.compute_loss(seq)
             else:
                 output = model(seq)
-                output = output.permute(1,2,0)
-                # print(output.shape)
-                # print(label.shape)
+                output = output.permute(0,2,1)
+
                 loss = criterion(output, label)
 
             optimizer.zero_grad()

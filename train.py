@@ -8,7 +8,7 @@ from torch.utils.data import TensorDataset, DataLoader
 import argparse
 from tqdm import tqdm
 import os
-from deeplog.model import *
+from net.dl import *
 
 # Device configuration
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -34,9 +34,9 @@ def generate_bgl(name, window_size):
     inputs = []
     outputs = []
     num_keys = set()
-    with open(name+'/window_' + str(window_size) +'future_1/normal_train.txt', 'r') as f_len:
+    with open(name+'/window_' + str(window_size) +'future_0remove_8//normal_train.txt', 'r') as f_len:
         file_len = len(f_len.readlines())
-    with open(name+'/window_'+ str(window_size) + 'future_1/normal_train.txt', 'r') as f:
+    with open(name+'/window_'+ str(window_size) + 'future_0remove_8/normal_train.txt', 'r') as f:
         for line in f.readlines():
             num_sessions += 1
             line = tuple(map(lambda n: n, map(int, line.strip().split())))
@@ -84,7 +84,7 @@ if __name__ == '__main__':
         num_classes = 28
     elif args.dataset == 'bgl':
         seq_dataset = generate_bgl('bgl', window_size)
-        num_classes = 1834
+        num_classes = 377
 
     if args.model == 'dl':
         model = DL(input_size, hidden_size, num_layers, num_classes)
