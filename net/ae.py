@@ -10,12 +10,13 @@ class AE(nn.Module):
         self.hidden_size = hidden_size
         self.num_layers = num_layers
         self.seq_len = seq_len
-        self.encoder = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True, dropout=dropout_rate)
+        self.encoder = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)
         self.compress_e = nn.Linear(hidden_size, latent)
         self.compress_d = nn.Linear(latent, hidden_size)
         self.decoder = nn.LSTM(hidden_size, hidden_size, num_layers, batch_first=True)
         self.fc = nn.Linear(hidden_size, num_keys)
         self.relu = nn.ReLU()
+        self.dropout = nn.Dropout(p=dropout_rate)
         nn.init.xavier_uniform_(self.compress_e.weight)
         nn.init.xavier_uniform_(self.compress_d.weight)
         size = 0
@@ -37,11 +38,11 @@ class AE(nn.Module):
         out = self.compress_e(out)
         out = self.relu(out)
         out = self.compress_d(out)
-
-        # h_e = torch.stack([h_e for _ in range(self.num_layers)])
         out , _ = self.decoder(out, (h_d, c_d))
-        out = out.permute(1,0,2)
+
         out = self.fc(out)
+        if out.shape[0] != 1:
+            out = self.dropout(out)
         return out
 
     def get_latent(self, x):

@@ -261,7 +261,6 @@ class VRAE(nn.Module):
         x_decoded = x_decoded.permute(0,2,1)
         x = x.long().squeeze(2)
 
-
         recon_loss = loss_fn(x_decoded, x)
 
         return kl_loss + recon_loss, recon_loss, kl_loss
