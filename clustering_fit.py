@@ -9,11 +9,11 @@ import argparse
 from tqdm import tqdm
 import os
 import numpy as np
-from ae.ae import AE, KMEANS
-from vae.vae import VRAE
+from net.ae import AE, KMEANS
+from net.vae import VRAE
 from sklearn.manifold import TSNE
 from pathlib import Path
-from deeplog.model import *
+from net.dl import *
 
 
 # Device configuration

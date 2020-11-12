@@ -22,8 +22,8 @@ def generate_bgl(name, window_size, step):
     inputs = []
     predict = []
     print('dataset at:')
-    print('bgl/window_'+str(window_size)+'future_' + str(step) + 'remove_8/' + name)
-    with open('bgl/window_'+str(window_size)+'future_' + str(step) + 'remove_8/' + name, 'r') as f_len:
+    print('bgl/loss_window_'+str(window_size)+'future_' + str(step) + 'remove_8/' + name)
+    with open('bgl/loss_window_'+str(window_size)+'future_' + str(step) + 'remove_8/' + name, 'r') as f_len:
         file_len = len(f_len.readlines())
     with open('bgl/window_'+str(window_size)+'future_' + str(step) + 'remove_8/' + name, 'r') as f:
         for line in f.readlines():

@@ -54,6 +54,48 @@ class AE(nn.Module):
         out = self.compress_e(out)
         return out
 
+class AE_Prediction(nn.Module):
+    def __init__(self, input_size, hidden_size, latent, num_layers, num_keys, seq_len, dropout_rate=0.0):
+        super(AE_Prediction, self).__init__()
+        self.hidden_size = hidden_size
+        self.num_layers = num_layers
+        self.seq_len = seq_len
+        self.encoder = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)
+        self.compress_e = nn.Linear(hidden_size, latent)
+        self.compress_d = nn.Linear(latent, hidden_size)
+        self.decoder = nn.LSTM(hidden_size, hidden_size, num_layers, batch_first=True)
+        self.fc = nn.Linear(hidden_size, num_keys)
+        self.relu = nn.ReLU()
+        self.dropout = nn.Dropout(p=dropout_rate)
+        nn.init.xavier_uniform_(self.compress_e.weight)
+        nn.init.xavier_uniform_(self.compress_d.weight)
+        size = 0
+
+        for p in self.parameters():
+            size += p.nelement()
+        print('Total param size: {}'.format(size))
+
+    def forward(self, x):
+        h_e = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(device)
+        c_e = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(device)
+        decoder_inputs = torch.zeros(self.seq_len, x.shape[0], 1, requires_grad=False).type(torch.FloatTensor).cuda()
+        
+        h_d = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(device)
+        c_d = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(device)
+
+        out, (_, _) = self.encoder(x, (h_e, c_e))
+        # out = torch.sum(out, dim=0)
+        out = self.compress_e(out)
+        out = self.relu(out)
+        out = self.compress_d(out)
+        out , _ = self.decoder(out, (h_d, c_d))
+
+        out = self.fc(out)
+        if out.shape[0] != 1:
+            out = self.dropout(out)
+        return out
+
+
 # code modified from https://zhuanlan.zhihu.com/p/65331686 
 class KMEANS:
     def __init__(self, n_clusters=10, max_iter=None, verbose=True, device=torch.device("cuda")):

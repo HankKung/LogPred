@@ -9,8 +9,8 @@ import argparse
 from tqdm import tqdm
 import os
 import numpy as np
-from ae.ae import AE, KMEANS
-from vae.vae import VRAE
+from net.ae import AE, KMEANS
+from net.vae import VRAE
 import random
 from deeplog.model import *
 

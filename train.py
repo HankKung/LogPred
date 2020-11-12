@@ -29,14 +29,14 @@ def generate_hd(name):
     dataset = TensorDataset(torch.tensor(inputs, dtype=torch.float), torch.tensor(outputs))
     return dataset
 
-def generate_bgl(name, window_size):
+def generate_bgl(name, window_size, step):
     num_sessions = 0
     inputs = []
     outputs = []
     num_keys = set()
-    with open(name+'/window_' + str(window_size) +'future_0remove_8//normal_train.txt', 'r') as f_len:
+    with open(name+'/window_' + str(window_size) +'future_'+ str(step) +'remove_8//normal_train.txt', 'r') as f_len:
         file_len = len(f_len.readlines())
-    with open(name+'/window_'+ str(window_size) + 'future_0remove_8/normal_train.txt', 'r') as f:
+    with open(name+'/window_'+ str(window_size) + 'future_'+ str(step)+'remove_8/normal_train.txt', 'r') as f:
         for line in f.readlines():
             num_sessions += 1
             line = tuple(map(lambda n: n, map(int, line.strip().split())))
@@ -66,6 +66,7 @@ if __name__ == '__main__':
     parser.add_argument('-model', type=str, default='dl', choices=['dl', 'att', 'trainable_att'])
     parser.add_argument('-dataset', type=str, default='hd', choices=['hd', 'bgl'])
     parser.add_argument('-epoch', default=300, type=int)
+    parser.add_argument('-step', default=5, type=int)
     args = parser.parse_args()
     num_layers = args.num_layers
     hidden_size = args.hidden_size
@@ -76,15 +77,19 @@ if __name__ == '__main__':
     '_window_size=' + str(window_size) + \
     '_hidden=' + str(hidden_size) + \
     '_dataset=' + args.dataset + \
-    '_epoch='+str(args.epoch)
+    '_epoch='+str(args.epoch) + \
+    '_step=' + str(args.step)
     log = log + '_' + args.model
 
     if args.dataset == 'hd':
         seq_dataset = generate_hd('hdfs_train')
         num_classes = 28
     elif args.dataset == 'bgl':
-        seq_dataset = generate_bgl('bgl', window_size)
+        seq_dataset = generate_bgl('bgl', window_size, args.step)
         num_classes = 377
+
+    if args.step != 0:
+        num_classes = 2
 
     if args.model == 'dl':
         model = DL(input_size, hidden_size, num_layers, num_classes)

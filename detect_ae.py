@@ -10,28 +10,66 @@ from net.vae import VRAE
 import os
 import random
 import json
-
+import re
 from net.ae import *
 
 # Device configuration
 device = torch.device("cuda")
 
 
-def generate_bgl(name, window_size):
+def generate_bgl(name, window_size, step):
     num_sessions = 0
     inputs = []
     print('dataset at:')
-    print('bgl/window_'+str(window_size)+'future_0' + 'remove_8_random/' + name)
-    with open('bgl/window_'+str(window_size)+'future_0' + 'remove_8_random/' + name, 'r') as f_len:
+    print('bgl/window_'+str(window_size)+'future_' + str(step) + 'remove_8/' + name)
+    with open('bgl/window_'+str(window_size)+'future_' + str(step) + 'remove_8/' + name, 'r') as f_len:
         file_len = len(f_len.readlines())
-    with open('bgl/window_'+str(window_size)+'future_0' + 'remove_8_random/' + name, 'r') as f:
+    with open('bgl/window_'+str(window_size)+'future_' + str(step) + 'remove_8/' + name, 'r') as f:
         for line in f.readlines():
             line = tuple(map(lambda n: n, map(int, line.strip().split())))
-            inputs.append(line)
+            inputs.append((line,line))
             num_sessions += 1
 
     print('Number of sessions({}): {}'.format(name, num_sessions))
     return inputs
+
+
+def generate_bgl_loss(name, step, slide):
+    num_sessions = 0
+    inputs = []
+    print('dataset at:')
+    print('bgl/loss_'+'future_' + str(step) + 'slide_' + str(slide) + '/' + name)
+    with open('bgl/loss_'+'future_' + str(step) + 'slide_' + str(slide) + '/' + name, 'r') as f_len:
+        file_len = len(f_len.readlines())
+    with open('bgl/loss_'+'future_' + str(step) + 'slide_' + str(slide) + '/' + name, 'r') as f:
+        for line in f.readlines():
+            loss = tuple(map(lambda n: n, map(float, line.strip().split()[:slide])))
+            log = tuple(map(lambda n: n, map(int, re.split(r",\s|\s|\[|\]|", line.strip())[slide+2:-1])))
+            # print(re.split(r",\s|\s|\[|\]|", line.strip()))
+            inputs.append((loss,log))
+            num_sessions += 1
+
+    print('Number of sessions({}): {}'.format(name, num_sessions))
+    return list(inputs)
+
+def generate_bgl_loss_full(window_size, step):
+    num_sessions = 0
+    inputs = set()
+    print('dataset at:')
+    print('bgl/loss_window_'+str(window_size)+'future_' + str(step) + 'remove_8/normal_loss_val_set.txt')
+    with open('bgl/loss_window_'+str(window_size)+'future_' + str(step) + 'remove_8/normal_loss_val_set.txt') as f_len:
+        file_len = len(f_len.readlines())
+    with open('bgl/loss_window_'+str(window_size)+'future_' + str(step) + 'remove_8/normal_loss_val_set.txt') as f:
+        for line in f.readlines():
+            line = tuple(map(lambda n: n, map(float, line.strip().split()[:-1])))
+            inputs.add(line)
+            num_sessions += 1
+    with open('bgl/loss_window_'+str(window_size)+'future_' + str(step) + 'remove_8/normal_loss_train_set.txt') as f:
+        for line in f.readlines():
+            line = tuple(map(lambda n: n, map(float, line.strip().split()[:-1])))
+            inputs.add(line)
+            num_sessions += 1
+    return list(inputs)
 
 def generate_hd(name, window_size):
 # use set for testing, it will take about one min
@@ -55,27 +93,55 @@ def generate_random_hdfs(window_size, num_samples):
         hdfs.append(line)
     return hdfs
 
+def store_log(dataset, name, log, step, slide):
+    if dataset == 'bgl':
+        data_dir = 'key_'
+    else:
+        data_dir = ''
+    data_dir = data_dir + 'step_' + str(step) + 'slide_' +str(slide) + '/' 
+    if not os.path.isdir(data_dir):
+        os.makedirs(data_dir)
+    with open(data_dir + name + '_log.txt', 'w') as f:
+        for i, item in enumerate(log):
+            out = ''
+            for j in item:
+                out = out + str(j) + ' ' 
+            f.write(out+'\n')
+
+def store_loss(name, loss, step, slide):
+
+    data_dir = 'step_' + str(step) + 'slide_' +str(slide) + '/' 
+    if not os.path.isdir(data_dir):
+        os.makedirs(data_dir)
+    with open(data_dir + name + '_loss.txt', 'w') as f:
+        for i, item in enumerate(loss):
+            out = ''
+            for j in item:
+                out = out + str(j) + ' ' 
+            f.write(out+'\n')
+
 if __name__ == '__main__':
 
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('-model', type=str, default='vae', choices=['vae', 'ae'])
-    parser.add_argument('-num_layers', default=2, type=int)
+    parser.add_argument('-model', type=str, default='ae', choices=['vae', 'ae'])
+    parser.add_argument('-num_layers', default=1, type=int)
     parser.add_argument('-hidden_size', default=128, type=int)
-    parser.add_argument('-latent_length', default=20, type=int)
+    parser.add_argument('-latent_length', default=16, type=int)
 
-    parser.add_argument('-window_size', default=20, type=int)
-    parser.add_argument('-dataset', type=str, default='hd', choices=['hd', 'bgl'])
-    parser.add_argument('-epoch', default=150, type=int)
+    parser.add_argument('-window_size', default=10, type=int)
+    parser.add_argument('-dataset', type=str, default='bgl_loss', choices=['bgl', 'bgl_loss', 'bgl_loss_full'])
+    parser.add_argument('-epoch', default=40, type=int)
     parser.add_argument('-lr', default=0.001, type=float)
     parser.add_argument('-dropout', default=0.0, type=float)
-
-    parser.add_argument('-error_threshold', default=0.1, type=float)
+    parser.add_argument('-step', default=5, type=int)
+    parser.add_argument('-slide', default=3, type=int)
+    parser.add_argument('-error_threshold', default=0.0005, type=float)
     
     args = parser.parse_args()
     num_layers = args.num_layers
     hidden_size = args.hidden_size
-    window_size = args.window_size
+    window_size = args.window_size if args.slide == 0 else args.slide
     num_epochs = args.epoch
     latent_length = args.latent_length
     dropout = args.dropout
@@ -83,20 +149,26 @@ if __name__ == '__main__':
 
     input_size = 1
 
-    log = 'model/' + \
-    'dataset=' + args.dataset + \
-    '_window_size=' + str(window_size) + \
-    '_hidden_size=' + str(hidden_size) + \
+    log = 'model/' + 'dataset=' + args.dataset
+
+    log = log + '_window_size=' + str(window_size) if args.slide == 0 else log + '_slide=' + str(args.slide)
+    log = log + '_hidden_size=' + str(hidden_size) + \
     '_latent_length=' + str(latent_length) + \
     '_num_layer=' + str(num_layers) + \
     '_epoch=' + str(num_epochs) + \
-    '_dropout=' + str(dropout)
+    '_dropout=' + str(dropout) + \
+    '_step=' +str(args.step)
+
 
     log = log + '_lr=' + str(args.lr) if args.lr != 0.001 else log
     log = log + '_' + args.model + '.pt' 
     print('retrieve model from: ', log)
 
-    criterion = nn.CrossEntropyLoss()
+    if args.dataset == 'bgl_loss' or args.dataset == 'bgl_loss_full':
+        criterion = torch.nn.MSELoss()
+    else:
+        criterion = nn.CrossEntropyLoss()
+
     if args.dataset == 'hd':
         test_normal_loader = generate_hd('hdfs_test_normal', window_size)
         test_abnormal_loader = generate_hd('hdfs_test_abnormal', window_size)
@@ -104,9 +176,17 @@ if __name__ == '__main__':
         num_classes = 28
         num_classes +=1
     elif args.dataset == 'bgl':
-        test_normal_loader = generate_bgl('normal_test.txt', window_size)
-        test_abnormal_loader = generate_bgl('abnormal_test.txt', window_size)
+        test_normal_loader = generate_bgl('normal_test.txt', window_size, args.step)
+        test_abnormal_loader = generate_bgl('abnormal_test.txt', window_size, args.step)
         num_classes = 377
+    elif 'bgl_loss' in args.dataset:
+        test_normal_loader = generate_bgl_loss('normal_loss_val_set.txt', args.step, args.slide)
+        test_abnormal_loader = generate_bgl_loss('abnormal_loss_val_set.txt', args.step, args.slide)
+        num_classes = 1
+    # elif args.dataset == 'bgl_loss_full':
+    #     test_normal_loader = generate_bgl_loss_full(window_size, args.step)
+    #     test_abnormal_loader = generate_bgl_loss('abnormal_loss_val_set.txt', window_size, args.step)
+    #     num_classes = 1
 
     len_normal = len(test_normal_loader)
     len_abnormal = len(test_abnormal_loader)
@@ -202,51 +282,100 @@ if __name__ == '__main__':
                         normal_error += loss.item()
                         n += 1
                     if n !=0 and TP !=0:
-                        tbar.set_description('normal error: %.3f TP error: %.3f' % ((normal_error / (n+ 1)), (TP_error / (TP + 1))))
+                        tbar.set_description('normal error: %.3f TP error: %.2f' % ((normal_error / (n+ 1)), (TP_error / (TP + 1))))
     else:
         TP = 0
         FP = 0
+        TP_set = []
+        FP_set = []
+        TN_set = []
+        FN_set = []
+        if args.dataset == 'bgl_loss':
+            TP_loss = []
+            FP_loss = []
+            TN_loss = []
+            FN_loss = []
+
+        print(len(test_abnormal_loader))
+        print(len(test_normal_loader))
         tbar = tqdm(test_normal_loader)
         with torch.no_grad():
             normal_error = 0.0
-            for index, line in enumerate(tbar):
+            for index, (line,log) in enumerate(tbar):
                 seq = torch.tensor(line, dtype=torch.float).view(-1, window_size, input_size).to(device)
-                label = torch.tensor(line, dtype=torch.long).to(device)
+                
+                if args.dataset == 'bgl_loss' or args.dataset == 'bgl_loss_full':
+                    label = torch.tensor(line, dtype=torch.float).to(device)
+                else:
+                    label = torch.tensor(line, dtype=torch.long).to(device)
                 label = label.unsqueeze(0)
 
                 if args.model == 'vae':
                     output, _ = model(seq)
                 else:
                     output = model(seq)
-                    output = output.permute(0,2,1)
-
+                    if args.dataset == 'bgl_loss' or args.dataset == 'bgl_loss_full':
+                        label = label.unsqueeze(2)
+                    else:
+                        output = output.permute(0,2,1)
                 loss = criterion(output, label)
                 if loss.item() > threshold:
                     FP += 1
+                    FP_set.append(log)
+                    if args.dataset == 'bgl_loss':
+                        FP_loss.append(line)
+                else:
+                    TN_set.append(log)
+                    if args.dataset == 'bgl_loss':
+                        TN_loss.append(line)
 
                 normal_error +=loss.item()
-                tbar.set_description('normal error: %.3f' % (normal_error / (index + 1)))
-
+                tbar.set_description('normal error: %.5f FP: %.1f' % (normal_error / (index + 1), FP))
         tbar = tqdm(test_abnormal_loader)
         with torch.no_grad():
             abnormal_error = 0.0
-            for index, line in enumerate(tbar):
+            for index, (line, log) in enumerate(tbar):
                 seq = torch.tensor(line, dtype=torch.float).view(-1, window_size, input_size).to(device)
-                label = torch.tensor(line).to(device)
+
+                if args.dataset == 'bgl_loss' or args.dataset == 'bgl_loss_full':
+                    label = torch.tensor(line, dtype=torch.float).to(device)
+                else:
+                    label = torch.tensor(line, dtype=torch.long).to(device)
                 label = label.unsqueeze(0)
+
                 if args.model == 'vae':
                     output, _ = model(seq)
                 else:
                     output = model(seq)
-                    output = output.permute(0,2,1)
+                    if args.dataset == 'bgl_loss' or args.dataset == 'bgl_loss_full':
+                        label = label.unsqueeze(2)
+                    else:
+                        output = output.permute(0,2,1)
                 loss = criterion(output, label)
 
                 if loss.item() > threshold:
                     TP += 1
+                    TP_set.append(log)
+                    if args.dataset == 'bgl_loss':
+                        TP_loss.append(line)
+                else:
+                    FN_set.append(log)
+                    if args.dataset == 'bgl_loss':
+                        FN_loss.append(line)
 
                 abnormal_error += loss.item()
-                tbar.set_description('abnormal error: %.3f' % (abnormal_error / (index + 1)))
+                tbar.set_description('abnormal error: %.5f, TP: %.1f' % (abnormal_error / (index + 1), TP))
 
+    store_log(args.dataset, 'TP', TP_set, args.step, window_size)
+    store_log(args.dataset, 'FP', FP_set, args.step, window_size)
+    store_log(args.dataset, 'TN', TN_set, args.step, window_size)
+    store_log(args.dataset, 'FN', FN_set, args.step, window_size)
+
+    if args.dataset == 'bgl_loss':
+        store_loss('TP', TP_loss, args.step, window_size)
+        store_loss('FP', FP_loss, args.step, window_size)
+        store_loss('TN', TN_loss, args.step, window_size)
+        store_loss('FN', FN_loss, args.step, window_size)
     # print('normal_avg_error:')
     # print(normal_error/len_normal)
     # print('abnormal_avg_error:')
@@ -254,9 +383,12 @@ if __name__ == '__main__':
 
     # Compute precision, recall and F1-measure
     FN = len(test_abnormal_loader) - TP
+    TN = len(test_normal_loader) - FP
+
     P = 100 * TP / (TP + FP)
     R = 100 * TP / (TP + FN)
     F1 = 2 * P * R / (P + R)
     print('false positive (FP): {}, false negative (FN): {}, Precision: {:.3f}%, Recall: {:.3f}%, F1-measure: {:.3f}%'.format(FP, FN, P, R, F1))
+    print('TP: {}, TN: {}'.format(TP, TN))
     print('Finished Predicting')
     
